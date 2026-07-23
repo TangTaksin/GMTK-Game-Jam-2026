@@ -72,8 +72,10 @@ public class PlayerTimer : MonoBehaviour
     {
         if (!isGrounded) return false;
 
-        // Must NOT press move input
-        bool hasNoInput = Mathf.Approximately(Input.GetAxisRaw("Horizontal"), 0f);
+        // Must NOT press active move input (A key / Left Arrow is disabled, so ignore moveX < 0)
+        float moveX = Input.GetAxisRaw("Horizontal");
+        if (moveX < 0f) moveX = 0f;
+        bool hasNoInput = Mathf.Approximately(moveX, 0f);
 
         // Must stop both linear moving & angular spinning
         bool isLinearStopped = rb.linearVelocity.magnitude <= stopSpeedThreshold;

@@ -438,7 +438,7 @@ Rigidbody2D:
   m_Mass: 1
   m_LinearDamping: 0
   m_AngularDamping: 0.05
-  m_GravityScale: 1
+  m_GravityScale: 2
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -470,8 +470,13 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   groundCheckDistance: 0.6
-  brakeForce: 5
+  disableBackwardInput: 1
+  preventBackwardRolling: 0
+  allowBackwardBuffer: 0
+  brakeForce: 3
   angularBrakeDamping: 1
+  maxFlatAngle: 9
+  slopeGravityAssist: 4
 --- !u!114 &6720383037309360983
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -484,11 +489,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8527474f262242a4ab7abbfb064e7d02, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Project.Player.PlayerTimer
-  maxTime: 10
+  maxTime: 16
   currentTime: 0
   stopSpeedThreshold: 2
-  stopAngularSpeedThreshold: 0.5
-  maxFlatAngle: 15
+  stopAngularSpeedThreshold: 1
+  maxFlatAngle: 30
   groundLayer:
     serializedVersion: 2
     m_Bits: 8

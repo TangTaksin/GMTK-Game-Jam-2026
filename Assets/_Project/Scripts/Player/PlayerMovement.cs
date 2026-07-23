@@ -21,6 +21,7 @@ public class PlayerMovement : MonoBehaviour
 
     private int jumpsRemaining;
     private bool isGrounded;
+    private Vector2 groundNormal = Vector2.up;
 
     private void Update()
     {
@@ -39,24 +40,57 @@ public class PlayerMovement : MonoBehaviour
         RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.down, groundCheckDistance, groundLayer);
         isGrounded = hit.collider != null;
 
-        if (isGrounded && rb.linearVelocity.y <= 0.1f)
+        if (isGrounded)
         {
-            jumpsRemaining = maxJumps;
+            groundNormal = hit.normal;
+            if (rb.linearVelocity.y <= 0.1f)
+            {
+                jumpsRemaining = maxJumps;
+            }
+        }
+        else
+        {
+            groundNormal = Vector2.up;
         }
     }
 
     [Header("Brake / Self-Stop System")]
     [SerializeField] private float brakeForce = 12f;
     [SerializeField] private float angularBrakeDamping = 10f;
+    [SerializeField] private float maxFlatAngle = 15f;
+    [SerializeField] private float slopeGravityAssist = 8f;
 
     private void FixedUpdate()
     {
         float moveX = Input.GetAxisRaw("Horizontal");
+        if (moveX < 0f) moveX = 0f; // Disable A / Left Arrow key input
+
+        float surfaceAngle = Vector2.Angle(groundNormal, Vector2.up);
+        bool isOnSlope = isGrounded && surfaceAngle > 5f;
 
         if (!Mathf.Approximately(moveX, 0f))
         {
+            Vector2 forceDir = new Vector2(moveX, 0f);
+
+            if (isOnSlope)
+            {
+                // Calculate slope tangent vectors (downhillTangent always points downward)
+                Vector2 downhillTangent = new Vector2(groundNormal.y, -groundNormal.x);
+                if (downhillTangent.y > 0f) downhillTangent = -downhillTangent;
+
+                Vector2 desiredHorizontalDir = new Vector2(Mathf.Sign(moveX), 0f);
+                if (Vector2.Dot(downhillTangent, desiredHorizontalDir) > 0f)
+                {
+                    forceDir = downhillTangent;
+                }
+                else
+                {
+                    forceDir = -downhillTangent;
+                }
+            }
+
             // Active player input
-            rb.AddForce(new Vector2(moveX * moveForce, 0f), ForceMode2D.Force);
+            rb.AddForce(forceDir * moveForce, ForceMode2D.Force);
 
             if (Mathf.Abs(rb.linearVelocity.x) > maxVelocity)
             {
@@ -65,16 +99,29 @@ public class PlayerMovement : MonoBehaviour
         }
         else
         {
-            // Self-stop system: Apply active counter-braking force & angular damping when no input
-            Vector2 currentVel = rb.linearVelocity;
-            if (Mathf.Abs(currentVel.x) > 0.05f)
-            {
-                float targetVelX = Mathf.MoveTowards(currentVel.x, 0f, brakeForce * Time.fixedDeltaTime);
-                rb.linearVelocity = new Vector2(targetVelX, currentVel.y);
-            }
+            bool isFlatGround = isGrounded && surfaceAngle <= maxFlatAngle;
 
-            // Slow down rotation spinning
-            rb.angularVelocity = Mathf.MoveTowards(rb.angularVelocity, 0f, angularBrakeDamping * Time.fixedDeltaTime * 100f);
+            if (isFlatGround)
+            {
+                // Self-stop system: Apply active counter-braking force & angular damping on flat surface
+                Vector2 currentVel = rb.linearVelocity;
+                if (Mathf.Abs(currentVel.x) > 0.05f)
+                {
+                    float targetVelX = Mathf.MoveTowards(currentVel.x, 0f, brakeForce * Time.fixedDeltaTime);
+                    rb.linearVelocity = new Vector2(targetVelX, currentVel.y);
+                }
+
+                // Slow down rotation spinning
+                rb.angularVelocity = Mathf.MoveTowards(rb.angularVelocity, 0f, angularBrakeDamping * Time.fixedDeltaTime * 100f);
+            }
+            else if (isOnSlope)
+            {
+                // On slopes without input: apply extra downhill force along slope tangent to overcome 2D static friction
+                Vector2 downhillTangent = new Vector2(groundNormal.y, -groundNormal.x);
+                if (downhillTangent.y > 0f) downhillTangent = -downhillTangent;
+
+                rb.AddForce(downhillTangent * slopeGravityAssist, ForceMode2D.Force);
+            }
         }
     }
 }
