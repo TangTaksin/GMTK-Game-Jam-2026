@@ -91,6 +91,11 @@ public class PlayerTimer : MonoBehaviour
         isExploded = true;
         Debug.Log("<color=red>BOOM! Player Exploded!</color>");
         gameObject.SetActive(false);
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.TriggerGameOver();
+        }
     }
 
     private void OnDrawGizmosSelected()

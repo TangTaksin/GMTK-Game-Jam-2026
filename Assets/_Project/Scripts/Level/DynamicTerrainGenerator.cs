@@ -40,6 +40,19 @@ public class DynamicTerrainGenerator : MonoBehaviour
     [Tooltip("Length of hilly slope zones where player slides and timer ticks down.")]
     [SerializeField] private float slopeZoneLength = 16.0f;
 
+    [Header("Start Boundary / Left Wall")]
+    [Tooltip("Distance behind player spawn to start ground generation.")]
+    [SerializeField] private float startBehindOffset = 10f;
+
+    [Tooltip("Automatically create an invisible wall to prevent player from falling left off the map.")]
+    [SerializeField] private bool createLeftWall = true;
+
+    [Tooltip("X position of the left invisible boundary wall.")]
+    [SerializeField] private float leftWallX = -5f;
+
+    [Tooltip("Height of the left invisible boundary wall.")]
+    [SerializeField] private float leftWallHeight = 30f;
+
     // Component references for 2D physics collision and rendering line
     private EdgeCollider2D edgeCollider;
     private LineRenderer lineRenderer;
@@ -76,9 +89,28 @@ public class DynamicTerrainGenerator : MonoBehaviour
             if (p != null) player = p.transform;
         }
 
+        // Start generating terrain behind player spawn position to prevent falling
+        currentX = -startBehindOffset;
+
         // Generate initial terrain around player spawn
         GenerateTerrainAhead();
         UpdateComponents();
+
+        // Create invisible left wall
+        if (createLeftWall)
+        {
+            CreateLeftBoundaryWall();
+        }
+    }
+
+    private void CreateLeftBoundaryWall()
+    {
+        GameObject wallObj = new GameObject("LeftBoundaryWall");
+        wallObj.transform.parent = transform;
+        wallObj.transform.position = new Vector3(leftWallX, baseHeight + leftWallHeight / 2f, 0f);
+
+        BoxCollider2D wallCollider = wallObj.AddComponent<BoxCollider2D>();
+        wallCollider.size = new Vector2(2f, leftWallHeight);
     }
 
     private void Update()
