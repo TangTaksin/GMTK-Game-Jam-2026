@@ -470,8 +470,8 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   groundCheckDistance: 0.6
-  brakeForce: 2.5
-  angularBrakeDamping: 0.2
+  brakeForce: 5
+  angularBrakeDamping: 1
 --- !u!114 &6720383037309360983
 MonoBehaviour:
   m_ObjectHideFlags: 0
