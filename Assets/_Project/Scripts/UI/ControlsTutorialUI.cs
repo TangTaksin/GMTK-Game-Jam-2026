@@ -18,7 +18,7 @@ public class ControlsTutorialUI : MonoBehaviour
     [TextArea(6, 12)]
     [SerializeField] private string tutorialContent =
         "<b><color=#FFD700>[ CONTROLS ]</color></b>\n" +
-        "• <b>A / D</b> or <b><color=#00FFFF>← / →</color></b> : Move Left / Right\n" +
+        "• <b>D</b> or <b><color=#00FFFF>→</color></b> : Move Right\n" +
         "• <b>Spacebar</b> : Jump / Double Jump\n" +
         "• <b>Release Keys on Flat Ground</b> : Stop & Reset Timer!\n" +
         "  <i>(Come to a complete stop before you explode)</i>";
@@ -54,7 +54,7 @@ public class ControlsTutorialUI : MonoBehaviour
         // Detect player movement input
         if (!playerHasMoved)
         {
-            if (Mathf.Abs(Input.GetAxisRaw("Horizontal")) > 0.1f || Input.GetButtonDown("Jump"))
+            if (Input.GetAxisRaw("Horizontal") > 0.1f || Input.GetButtonDown("Jump"))
             {
                 playerHasMoved = true;
             }
