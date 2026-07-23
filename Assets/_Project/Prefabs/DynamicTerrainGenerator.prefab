@@ -69,7 +69,7 @@ EdgeCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_EdgeRadius: 0
+  m_EdgeRadius: 0.15
   m_Points: []
   m_AdjacentStartPoint: {x: 0, y: 0}
   m_AdjacentEndPoint: {x: 0, y: 0}
@@ -197,13 +197,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DynamicTerrainGenerator
   player: {fileID: 0}
   generateAheadDistance: 30
-  removeBehindDistance: 15
+  removeBehindDistance: 30
   xStep: 0.5
   frequency: 0.05
   amplitude: 4
   baseHeight: -3
   flatZoneLength: 8
   slopeZoneLength: 16
+  transitionLength: 2
   startBehindOffset: 10
   createLeftWall: 1
   leftWallX: -5

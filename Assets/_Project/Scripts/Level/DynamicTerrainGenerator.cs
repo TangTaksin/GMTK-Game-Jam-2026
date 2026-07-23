@@ -17,7 +17,7 @@ public class DynamicTerrainGenerator : MonoBehaviour
     [SerializeField] private float generateAheadDistance = 30f;
     
     [Tooltip("Distance behind the player to remove old terrain for memory optimization.")]
-    [SerializeField] private float removeBehindDistance = 15f;
+    [SerializeField] private float removeBehindDistance = 35f;
 
     [Header("Terrain Resolution")]
     [Tooltip("Horizontal step interval between terrain points (smaller = higher detail).")]
@@ -40,6 +40,9 @@ public class DynamicTerrainGenerator : MonoBehaviour
     [Tooltip("Length of hilly slope zones where player slides and timer ticks down.")]
     [SerializeField] private float slopeZoneLength = 16.0f;
 
+    [Tooltip("Transition length in units to smoothly blend between flat zones and slope zones.")]
+    [SerializeField] private float transitionLength = 2.0f;
+
     [Header("Start Boundary / Left Wall")]
     [Tooltip("Distance behind player spawn to start ground generation.")]
     [SerializeField] private float startBehindOffset = 10f;
@@ -53,31 +56,33 @@ public class DynamicTerrainGenerator : MonoBehaviour
     [Tooltip("Height of the left invisible boundary wall.")]
     [SerializeField] private float leftWallHeight = 30f;
 
-    // Component references for 2D physics collision and rendering line
+    // Component references
     private EdgeCollider2D edgeCollider;
     private LineRenderer lineRenderer;
+    private Transform leftWallTransform;
 
-    // Pre-allocated List for terrain points (reduces Garbage Collection overhead)
+    // Pre-allocated collections to minimize GC allocations
     private readonly List<Vector2> points = new List<Vector2>(128);
-    
-    // Array buffer passed to LineRenderer to avoid instantiating new Vector3[] every frame
+    private readonly List<Vector2> localPoints = new List<Vector2>(128);
     private Vector3[] linePositions = new Vector3[128];
 
     private float currentX;
     private float seed;
-    private float cycleLength;
     private bool isDirty;
+
+    private float CycleLength => flatZoneLength + slopeZoneLength;
 
     private void Awake()
     {
+        // Enforce world origin anchor so Local Space == World Space for EdgeCollider2D
+        transform.position = Vector3.zero;
+        transform.rotation = Quaternion.identity;
+        transform.localScale = Vector3.one;
+
         edgeCollider = GetComponent<EdgeCollider2D>();
         lineRenderer = GetComponent<LineRenderer>();
         
-        // Randomize seed so each playthrough generates unique hills
         seed = Random.Range(0f, 1000f);
-        
-        // Calculate total cycle length (flat safe zone + hilly slope zone)
-        cycleLength = flatZoneLength + slopeZoneLength;
     }
 
     private void Start()
@@ -89,25 +94,31 @@ public class DynamicTerrainGenerator : MonoBehaviour
             if (p != null) player = p.transform;
         }
 
-        // Start generating terrain behind player spawn position to prevent falling
-        currentX = -startBehindOffset;
-
-        // Generate initial terrain around player spawn
-        GenerateTerrainAhead();
-        UpdateComponents();
-
-        // Create invisible left wall
         if (createLeftWall)
         {
             CreateLeftBoundaryWall();
         }
+
+        if (player == null)
+        {
+            Debug.LogWarning("[DynamicTerrainGenerator] No player transform assigned or tagged 'Player' found in scene.", this);
+            return;
+        }
+
+        // Start generating terrain behind player spawn position to prevent falling
+        currentX = player.position.x - startBehindOffset;
+
+        // Generate initial terrain around player spawn
+        GenerateTerrainAhead();
+        UpdateComponents();
     }
 
     private void CreateLeftBoundaryWall()
     {
         GameObject wallObj = new GameObject("LeftBoundaryWall");
-        wallObj.transform.parent = transform;
-        wallObj.transform.position = new Vector3(leftWallX, baseHeight + leftWallHeight / 2f, 0f);
+        wallObj.transform.SetParent(transform, false);
+        leftWallTransform = wallObj.transform;
+        leftWallTransform.position = new Vector3(leftWallX, baseHeight + leftWallHeight / 2f, 0f);
 
         BoxCollider2D wallCollider = wallObj.AddComponent<BoxCollider2D>();
         wallCollider.size = new Vector2(2f, leftWallHeight);
@@ -117,23 +128,21 @@ public class DynamicTerrainGenerator : MonoBehaviour
     {
         if (player == null) return;
 
-        // Check if player is approaching end of generated terrain ahead
-        bool needsGenerate = currentX - player.position.x < generateAheadDistance;
-        
-        // Check if old terrain points behind player exceed cutoff distance
-        bool needsCleanup = points.Count > 0 && points[0].x < player.position.x - removeBehindDistance;
+        float playerX = player.position.x;
 
-        if (needsGenerate)
+        // Check if player is approaching end of generated terrain ahead
+        if (currentX - playerX < generateAheadDistance)
         {
             GenerateTerrainAhead();
         }
 
-        if (needsCleanup)
+        // Check if old terrain points behind player exceed cutoff distance
+        if (points.Count > 0 && points[0].x < playerX - removeBehindDistance)
         {
             CleanupBehind();
         }
 
-        // Update physics collider and visual rendering only when points change (Batch Update)
+        // Update physics collider and visual rendering only when points change
         if (isDirty)
         {
             UpdateComponents();
@@ -146,6 +155,8 @@ public class DynamicTerrainGenerator : MonoBehaviour
     /// </summary>
     private void GenerateTerrainAhead()
     {
+        if (player == null) return;
+
         float targetX = player.position.x + generateAheadDistance;
 
         while (currentX < targetX)
@@ -158,23 +169,56 @@ public class DynamicTerrainGenerator : MonoBehaviour
     }
 
     /// <summary>
-    /// Mathematical formula to calculate Y height at any given X position.
+    /// Mathematical formula to calculate Y height at any given X position with smooth transition blending.
     /// </summary>
     private float CalculateHeightAt(float x)
     {
-        // Get current position within cycle phase (0 to cycleLength)
-        float positionInCycle = Mathf.Repeat(x, cycleLength);
+        float cycle = CycleLength;
+        if (cycle <= 0f) return baseHeight;
 
-        // 1. Safe Flat Zone: Return constant flat ground height for resetting player timer
-        if (positionInCycle < flatZoneLength)
-        {
-            return (Mathf.PerlinNoise(seed + (x - positionInCycle) * frequency, 0f) * amplitude) + baseHeight;
-        }
+        // Get current position within cycle phase (0 to cycle)
+        float positionInCycle = Mathf.Repeat(x, cycle);
 
-        // 2. Slope Zone: Combine Perlin Noise + Sine wave for dynamic hills
+        // Calculate constant flat ground height for current cycle
+        float flatX = x - positionInCycle;
+        float flatHeight = (Mathf.PerlinNoise(seed + flatX * frequency, 0f) * amplitude) + baseHeight;
+
+        // Calculate dynamic slope height at position x
         float noise = Mathf.PerlinNoise(seed + x * frequency, 0f) * amplitude;
         float wave = Mathf.Sin(x * 0.2f) * 1.5f;
-        return baseHeight + noise + wave;
+        float slopeHeight = baseHeight + noise + wave;
+
+        // Clamp transition length to half of flatZoneLength to prevent overlap
+        float maxTransition = flatZoneLength * 0.4f;
+        float actualTransition = Mathf.Min(transitionLength, maxTransition);
+
+        if (actualTransition <= 0.0001f)
+        {
+            return positionInCycle < flatZoneLength ? flatHeight : slopeHeight;
+        }
+
+        // 1. Transition from previous Slope Zone into Flat Zone
+        if (positionInCycle < actualTransition)
+        {
+            float t = positionInCycle / actualTransition;
+            return Mathf.Lerp(flatHeight, slopeHeight, Mathf.SmoothStep(1f, 0f, t));
+        }
+
+        // 2. Pure Safe Flat Zone
+        if (positionInCycle < flatZoneLength - actualTransition)
+        {
+            return flatHeight;
+        }
+
+        // 3. Transition from Flat Zone into Slope Zone
+        if (positionInCycle < flatZoneLength)
+        {
+            float t = (positionInCycle - (flatZoneLength - actualTransition)) / actualTransition;
+            return Mathf.Lerp(flatHeight, slopeHeight, Mathf.SmoothStep(0f, 1f, t));
+        }
+
+        // 4. Pure Slope Zone
+        return slopeHeight;
     }
 
     /// <summary>
@@ -182,6 +226,8 @@ public class DynamicTerrainGenerator : MonoBehaviour
     /// </summary>
     private void CleanupBehind()
     {
+        if (player == null) return;
+
         float cutoffX = player.position.x - removeBehindDistance;
         int removeCount = 0;
 
@@ -191,7 +237,7 @@ public class DynamicTerrainGenerator : MonoBehaviour
             removeCount++;
         }
 
-        // Batch remove points in a single call (RemoveRange) for performance
+        // Batch remove points in a single call for performance
         if (removeCount > 0)
         {
             points.RemoveRange(0, removeCount);
@@ -201,30 +247,57 @@ public class DynamicTerrainGenerator : MonoBehaviour
 
     /// <summary>
     /// Updates EdgeCollider2D physics points and LineRenderer visual positions.
+    /// Converts World Space terrain calculations into EdgeCollider2D Local Space coordinates.
     /// </summary>
     private void UpdateComponents()
     {
         int count = points.Count;
         if (count < 2) return;
 
-        // 1. Update 2D physics collider points for Rigidbody2D interaction
-        edgeCollider.SetPoints(points);
-
-        // 2. Resize buffer array if point count exceeds current buffer size
         if (linePositions.Length < count)
         {
             linePositions = new Vector3[count * 2];
         }
 
-        // 3. Convert Vector2 points into cached Vector3 buffer (Zero GC allocation)
-        for (int i = 0; i < count; i++)
+        bool isAtOrigin = transform.position == Vector3.zero && transform.rotation == Quaternion.identity && transform.localScale == Vector3.one;
+
+        if (isAtOrigin)
         {
-            Vector2 p = points[i];
-            linePositions[i] = new Vector3(p.x, p.y, 0f);
+            // Zero offset optimization: direct pass-through
+            edgeCollider.SetPoints(points);
+
+            for (int i = 0; i < count; i++)
+            {
+                Vector2 p = points[i];
+                linePositions[i] = new Vector3(p.x, p.y, 0f);
+            }
+        }
+        else
+        {
+            // Convert World Space points into Local Space for EdgeCollider2D
+            localPoints.Clear();
+            for (int i = 0; i < count; i++)
+            {
+                Vector2 worldP = points[i];
+                Vector3 localP = transform.InverseTransformPoint(new Vector3(worldP.x, worldP.y, 0f));
+                localPoints.Add(new Vector2(localP.x, localP.y));
+                linePositions[i] = localP;
+            }
+
+            edgeCollider.SetPoints(localPoints);
         }
 
-        // 4. Render visual terrain line
+        // Render visual terrain line
+        lineRenderer.useWorldSpace = isAtOrigin;
         lineRenderer.positionCount = count;
         lineRenderer.SetPositions(linePositions);
+
+        // Dynamic safety wall trailing at the leftmost edge of existing terrain
+        if (createLeftWall && leftWallTransform != null)
+        {
+            float safeLeftX = points[0].x + 0.5f;
+            leftWallTransform.position = new Vector3(safeLeftX, baseHeight + leftWallHeight / 2f, leftWallTransform.position.z);
+        }
     }
 }
+
