@@ -88,7 +88,7 @@ public class PlayerTimer : MonoBehaviour
         return hasNoInput && isLinearStopped && isAngularStopped && isFlat;
     }
 
-    private void Explode()
+    public void Explode()
     {
         isExploded = true;
         Debug.Log("<color=red>BOOM! Player Exploded!</color>");
