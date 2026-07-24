@@ -196,16 +196,26 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DynamicTerrainGenerator
   player: {fileID: 0}
-  generateAheadDistance: 30
-  removeBehindDistance: 30
+  generateAheadDistance: 20
+  removeBehindDistance: 15
   xStep: 0.5
   frequency: 0.05
   amplitude: 4
   baseHeight: -3
+  initialSafeZoneEnd: 15
   flatZoneLength: 8
   slopeZoneLength: 16
   transitionLength: 2
   startBehindOffset: 10
   createLeftWall: 1
-  leftWallX: -5
-  leftWallHeight: 30
+  enableChasingThreat: 1
+  leftWallX: -10
+  leftWallHeight: 4
+  threatBaseSpeed: 2
+  threatSpeedIncreasePerMeter: 0.01
+  threatMaxDistanceBehind: 20
+  threatStartGraceDelay: 2
+  threatSprite: {fileID: 21300000, guid: ba31b6a4d88ef3142ab87d3ffadebeba, type: 3}
+  threatColor: {r: 1, g: 0.2, b: 0.2, a: 0.7}
+  threatSortingLayer: Default
+  threatSortingOrder: 10

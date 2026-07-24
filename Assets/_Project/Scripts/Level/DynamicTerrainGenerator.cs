@@ -34,6 +34,9 @@ public class DynamicTerrainGenerator : MonoBehaviour
     [SerializeField] private float baseHeight = -3.0f;
 
     [Header("Pacing & Safe Flat Zones")]
+    [Tooltip("Guaranteed 100% flat ground distance around player spawn (e.g. up to X = 15).")]
+    [SerializeField] private float initialSafeZoneEnd = 15.0f;
+
     [Tooltip("Length of guaranteed flat ground zones for resetting the player timer.")]
     [SerializeField] private float flatZoneLength = 8.0f;
     
@@ -43,18 +46,47 @@ public class DynamicTerrainGenerator : MonoBehaviour
     [Tooltip("Transition length in units to smoothly blend between flat zones and slope zones.")]
     [SerializeField] private float transitionLength = 2.0f;
 
-    [Header("Start Boundary / Left Wall")]
+    [Header("Start Boundary / Chasing Threat")]
     [Tooltip("Distance behind player spawn to start ground generation.")]
     [SerializeField] private float startBehindOffset = 10f;
 
     [Tooltip("Automatically create an invisible wall to prevent player from falling left off the map.")]
     [SerializeField] private bool createLeftWall = true;
 
-    [Tooltip("X position of the left invisible boundary wall.")]
+    [Tooltip("Enable Chasing Threat component on the left boundary wall.")]
+    [SerializeField] private bool enableChasingThreat = true;
+
+    [Tooltip("X position of the left boundary wall.")]
     [SerializeField] private float leftWallX = -5f;
 
-    [Tooltip("Height of the left invisible boundary wall.")]
+    [Tooltip("Height of the left boundary wall.")]
     [SerializeField] private float leftWallHeight = 30f;
+
+    [Header("Chasing Threat Movement Settings")]
+    [Tooltip("Base movement speed of chasing threat.")]
+    [SerializeField] private float threatBaseSpeed = 3.5f;
+
+    [Tooltip("Speed increase rate per meter traveled.")]
+    [SerializeField] private float threatSpeedIncreasePerMeter = 0.01f;
+
+    [Tooltip("Max lag distance behind player before accelerating catch-up.")]
+    [SerializeField] private float threatMaxDistanceBehind = 14f;
+
+    [Tooltip("Delay in seconds after player first moves before threat activates.")]
+    [SerializeField] private float threatStartGraceDelay = 1.0f;
+
+    [Header("Chasing Threat Visuals")]
+    [Tooltip("Sprite image for the chasing threat wall.")]
+    [SerializeField] private Sprite threatSprite;
+
+    [Tooltip("Color tint for the chasing threat wall.")]
+    [SerializeField] private Color threatColor = new Color(1f, 0.2f, 0.2f, 0.7f);
+
+    [Tooltip("Sorting layer name for threat sprite renderer.")]
+    [SerializeField] private string threatSortingLayer = "Default";
+
+    [Tooltip("Sorting order for threat sprite renderer.")]
+    [SerializeField] private int threatSortingOrder = 10;
 
     // Component references
     private EdgeCollider2D edgeCollider;
@@ -72,8 +104,17 @@ public class DynamicTerrainGenerator : MonoBehaviour
 
     private float CycleLength => flatZoneLength + slopeZoneLength;
 
+    public static DynamicTerrainGenerator Instance { get; private set; }
+
     private void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+
         // Enforce world origin anchor so Local Space == World Space for EdgeCollider2D
         transform.position = Vector3.zero;
         transform.rotation = Quaternion.identity;
@@ -120,8 +161,39 @@ public class DynamicTerrainGenerator : MonoBehaviour
         leftWallTransform = wallObj.transform;
         leftWallTransform.position = new Vector3(leftWallX, baseHeight + leftWallHeight / 2f, 0f);
 
+        float wallWidth = 2f;
+
         BoxCollider2D wallCollider = wallObj.AddComponent<BoxCollider2D>();
-        wallCollider.size = new Vector2(2f, leftWallHeight);
+        wallCollider.size = new Vector2(wallWidth, leftWallHeight);
+        wallCollider.isTrigger = true;
+
+        // Add SpriteRenderer for visual appearance
+        SpriteRenderer sr = wallObj.AddComponent<SpriteRenderer>();
+        sr.color = threatColor;
+        sr.sortingLayerName = threatSortingLayer;
+        sr.sortingOrder = threatSortingOrder;
+
+        if (threatSprite != null)
+        {
+            sr.sprite = threatSprite;
+            sr.drawMode = SpriteDrawMode.Sliced;
+            sr.size = new Vector2(wallWidth, leftWallHeight);
+        }
+        else
+        {
+            // Generate 1x1 fallback white texture sprite if no sprite assigned
+            Texture2D tex = new Texture2D(1, 1);
+            tex.SetPixel(0, 0, Color.white);
+            tex.Apply();
+            sr.sprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1f);
+            wallObj.transform.localScale = new Vector3(wallWidth, leftWallHeight, 1f);
+        }
+
+        if (enableChasingThreat)
+        {
+            ChasingThreat threatComponent = wallObj.AddComponent<ChasingThreat>();
+            threatComponent.Initialize(threatBaseSpeed, threatSpeedIncreasePerMeter, threatMaxDistanceBehind, threatStartGraceDelay);
+        }
     }
 
     private void Update()
@@ -171,7 +243,28 @@ public class DynamicTerrainGenerator : MonoBehaviour
     /// <summary>
     /// Mathematical formula to calculate Y height at any given X position with smooth transition blending.
     /// </summary>
-    private float CalculateHeightAt(float x)
+    public float CalculateHeightAt(float x)
+    {
+        // 0. Guaranteed 100% flat ground at initial spawn area
+        if (x <= initialSafeZoneEnd)
+        {
+            return baseHeight;
+        }
+
+        // Smooth transition from initial flat ground into dynamic terrain
+        float initialTransitionEnd = initialSafeZoneEnd + transitionLength;
+        float baseDynamicHeight = CalculateProceduralHeightAt(x);
+
+        if (x < initialTransitionEnd)
+        {
+            float t = (x - initialSafeZoneEnd) / transitionLength;
+            return Mathf.Lerp(baseHeight, baseDynamicHeight, Mathf.SmoothStep(0f, 1f, t));
+        }
+
+        return baseDynamicHeight;
+    }
+
+    private float CalculateProceduralHeightAt(float x)
     {
         float cycle = CycleLength;
         if (cycle <= 0f) return baseHeight;
@@ -293,7 +386,7 @@ public class DynamicTerrainGenerator : MonoBehaviour
         lineRenderer.SetPositions(linePositions);
 
         // Dynamic safety wall trailing at the leftmost edge of existing terrain
-        if (createLeftWall && leftWallTransform != null)
+        if (createLeftWall && leftWallTransform != null && !enableChasingThreat)
         {
             float safeLeftX = points[0].x + 0.5f;
             leftWallTransform.position = new Vector3(safeLeftX, baseHeight + leftWallHeight / 2f, leftWallTransform.position.z);
