@@ -8,13 +8,14 @@ public class PlayerTimer : MonoBehaviour
     [SerializeField] private float currentTime;
 
     [Header("Safe Stop Conditions")]
-    [SerializeField] private float stopSpeedThreshold = 0.1f;
+    [SerializeField] private float stopSpeedThreshold = 0.4f;
     [SerializeField] private float stopAngularSpeedThreshold = 1.0f;
-    [SerializeField] private float maxFlatAngle = 15.0f;
+    [SerializeField] private float maxFlatAngle = 20.0f;
     [SerializeField] private LayerMask groundLayer;
     [SerializeField] private float groundCheckDistance = 0.6f;
 
     private Rigidbody2D rb;
+    private PlayerMovement playerMovement;
     private bool isGrounded;
     private Vector2 groundNormal = Vector2.up;
     private bool isExploded;
@@ -26,6 +27,7 @@ public class PlayerTimer : MonoBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
+        playerMovement = GetComponent<PlayerMovement>();
         currentTime = maxTime;
     }
 
@@ -55,6 +57,13 @@ public class PlayerTimer : MonoBehaviour
 
     private void CheckGrounded()
     {
+        if (playerMovement != null)
+        {
+            isGrounded = playerMovement.IsGrounded;
+            groundNormal = playerMovement.GroundNormal;
+            return;
+        }
+
         RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.down, groundCheckDistance, groundLayer);
         if (hit.collider != null)
         {

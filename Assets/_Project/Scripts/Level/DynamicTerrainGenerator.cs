@@ -33,6 +33,25 @@ public class DynamicTerrainGenerator : MonoBehaviour
     [Tooltip("Base ground Y position.")]
     [SerializeField] private float baseHeight = -3.0f;
 
+    [Header("Solid Ground Mesh Fill")]
+    [Tooltip("Generate solid filled ground mesh below terrain surface so no empty space shows underneath.")]
+    [SerializeField] private bool enableGroundFill = true;
+
+    [Tooltip("Depth in units for solid ground fill underneath base height.")]
+    [SerializeField] private float fillDepth = 40f;
+
+    [Tooltip("Material for solid ground mesh. If null, a fallback solid ground material will be created.")]
+    [SerializeField] private Material groundMaterial;
+
+    [Tooltip("Solid ground color tint when using default material.")]
+    [SerializeField] private Color groundColor = new Color(0.2f, 0.45f, 0.25f, 1f);
+
+    [Tooltip("Sorting layer for ground fill mesh renderer.")]
+    [SerializeField] private string groundSortingLayer = "Default";
+
+    [Tooltip("Sorting order for ground fill mesh renderer (behind surface line).")]
+    [SerializeField] private int groundSortingOrder = 0;
+
     [Header("Pacing & Safe Flat Zones")]
     [Tooltip("Guaranteed 100% flat ground distance around player spawn (e.g. up to X = 15).")]
     [SerializeField] private float initialSafeZoneEnd = 15.0f;
@@ -91,6 +110,9 @@ public class DynamicTerrainGenerator : MonoBehaviour
     // Component references
     private EdgeCollider2D edgeCollider;
     private LineRenderer lineRenderer;
+    private MeshFilter meshFilter;
+    private MeshRenderer meshRenderer;
+    private Mesh groundMesh;
     private Transform leftWallTransform;
 
     // Pre-allocated collections to minimize GC allocations
@@ -123,6 +145,21 @@ public class DynamicTerrainGenerator : MonoBehaviour
         edgeCollider = GetComponent<EdgeCollider2D>();
         lineRenderer = GetComponent<LineRenderer>();
         
+        meshFilter = GetComponent<MeshFilter>();
+        if (meshFilter == null) meshFilter = gameObject.AddComponent<MeshFilter>();
+
+        meshRenderer = GetComponent<MeshRenderer>();
+        if (meshRenderer == null) meshRenderer = gameObject.AddComponent<MeshRenderer>();
+
+        if (groundMesh == null)
+        {
+            groundMesh = new Mesh();
+            groundMesh.name = "SolidGroundMesh";
+            meshFilter.sharedMesh = groundMesh;
+        }
+
+        SetupGroundMaterial();
+
         seed = Random.Range(0f, 1000f);
     }
 
@@ -385,12 +422,92 @@ public class DynamicTerrainGenerator : MonoBehaviour
         lineRenderer.positionCount = count;
         lineRenderer.SetPositions(linePositions);
 
+        // Update solid ground mesh fill below surface line
+        UpdateGroundMesh(count);
+
         // Dynamic safety wall trailing at the leftmost edge of existing terrain
         if (createLeftWall && leftWallTransform != null && !enableChasingThreat)
         {
             float safeLeftX = points[0].x + 0.5f;
             leftWallTransform.position = new Vector3(safeLeftX, baseHeight + leftWallHeight / 2f, leftWallTransform.position.z);
         }
+    }
+
+    private void SetupGroundMaterial()
+    {
+        if (meshRenderer == null) return;
+
+        if (groundMaterial != null)
+        {
+            meshRenderer.sharedMaterial = groundMaterial;
+        }
+        else
+        {
+            Shader iceShader = Shader.Find("Custom/IceGroundShader");
+            if (iceShader != null)
+            {
+                Material mat = new Material(iceShader);
+                meshRenderer.sharedMaterial = mat;
+            }
+            else
+            {
+                Shader shader = Shader.Find("Sprites/Default");
+                if (shader == null) shader = Shader.Find("Unlit/Color");
+                Material mat = new Material(shader);
+                mat.color = groundColor;
+                meshRenderer.sharedMaterial = mat;
+            }
+        }
+
+        meshRenderer.sortingLayerName = groundSortingLayer;
+        meshRenderer.sortingOrder = groundSortingOrder;
+    }
+
+    private void UpdateGroundMesh(int count)
+    {
+        if (!enableGroundFill || count < 2 || groundMesh == null) return;
+
+        float bottomY = baseHeight - fillDepth;
+
+        Vector3[] verts = new Vector3[count * 2];
+        Vector2[] uvs = new Vector2[count * 2];
+        int[] tris = new int[(count - 1) * 6];
+
+        for (int i = 0; i < count; i++)
+        {
+            Vector2 p = points[i];
+
+            // Upper surface vertex (hugs LineRenderer edge exactly)
+            verts[i * 2] = new Vector3(p.x, p.y, 0.1f);
+            // Lower deep ground vertex
+            verts[i * 2 + 1] = new Vector3(p.x, bottomY, 0.1f);
+
+            uvs[i * 2] = new Vector2(p.x * 0.1f, 1.0f);
+            uvs[i * 2 + 1] = new Vector2(p.x * 0.1f, 0.0f);
+        }
+
+        int triIndex = 0;
+        for (int i = 0; i < count - 1; i++)
+        {
+            int topL = i * 2;
+            int botL = i * 2 + 1;
+            int topR = (i + 1) * 2;
+            int botR = (i + 1) * 2 + 1;
+
+            tris[triIndex++] = topL;
+            tris[triIndex++] = topR;
+            tris[triIndex++] = botL;
+
+            tris[triIndex++] = botL;
+            tris[triIndex++] = topR;
+            tris[triIndex++] = botR;
+        }
+
+        groundMesh.Clear();
+        groundMesh.vertices = verts;
+        groundMesh.uv = uvs;
+        groundMesh.triangles = tris;
+        groundMesh.RecalculateBounds();
     }
 }
 
