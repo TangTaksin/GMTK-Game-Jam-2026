@@ -35,7 +35,7 @@ public class GameOverUI : MonoBehaviour
             int highScore = ScoreManager.Instance != null ? ScoreManager.Instance.HighScore : 0;
             bool isNewHigh = ScoreManager.Instance != null && ScoreManager.Instance.IsNewHighScore;
 
-            string highMsg = isNewHigh ? "<color=#00FFCC><b>★ NEW HIGH SCORE! ★</b></color>\n" : "";
+            string highMsg = isNewHigh ? "<color=#00FFCC><b>NEW HIGH SCORE!</b></color>\n" : "";
 
             gameOverText.text =
                 "<b><color=#FF3333>GAME OVER!</color></b>\n\n" +
