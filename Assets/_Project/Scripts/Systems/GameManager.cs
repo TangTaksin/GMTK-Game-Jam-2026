@@ -68,6 +68,15 @@ public class GameManager : MonoBehaviour
         IsGameOver = true;
         Debug.Log("<color=red>[GameManager] Game Over! Press R to Restart.</color>");
 
+        PlayerTimer[] bombTimers = FindObjectsByType<PlayerTimer>(FindObjectsSortMode.None);
+        foreach (var bomb in bombTimers)
+        {
+            if (bomb != null)
+            {
+                bomb.gameObject.SetActive(false);
+            }
+        }
+
         if (gameOverUI != null)
         {
             gameOverUI.SetActive(true);

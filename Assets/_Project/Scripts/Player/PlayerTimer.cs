@@ -17,12 +17,16 @@ public class PlayerTimer : MonoBehaviour
 
     [Header("Defuse Animation Settings")]
     [SerializeField] private bool enableProceduralDefuseAnim = true;
-    [SerializeField] private Animator playerAnimator;
-    [SerializeField] private string defuseAnimBoolName = "IsDefusing";
-    [SerializeField] private float defuseSquashY = 0.75f;
-    [SerializeField] private float defuseStretchX = 1.15f;
+    [SerializeField] private bool enableScaleSquash = false;
+    [SerializeField] private float defuseSquashY = 1.0f;
+    [SerializeField] private float defuseStretchX = 1.0f;
     [SerializeField] private float defuseWiggleSpeed = 25.0f;
     [SerializeField] private float defuseWiggleAngle = 4.0f;
+    [Tooltip("Downward vertical offset applied while defusing to keep feet grounded.")]
+    [SerializeField] private float defuseYOffset = 0.0f;
+
+    [Header("Explosion Particle Settings")]
+    [SerializeField] private ParticleSystem explosionParticlePrefab;
 
     [Header("Ground Check")]
     [SerializeField] private LayerMask groundLayer;
@@ -34,9 +38,12 @@ public class PlayerTimer : MonoBehaviour
     private bool isGrounded;
     private float groundRestTimer = 0f;
     private bool isExploded;
+    private bool hasDefusedThisDrop = false;
 
-    private Vector3 initialPlayerScale = Vector3.one;
-    private bool playerScaleCached = false;
+    private Vector3 initialVisualScale = Vector3.one;
+    private Vector3 initialVisualLocalPos = Vector3.zero;
+    private bool visualScaleCached = false;
+    private Transform targetVisualTransform;
     private bool wasDefusing = false;
 
     public float CurrentTime => currentTime;
@@ -46,7 +53,7 @@ public class PlayerTimer : MonoBehaviour
     public bool IsGrounded => isGrounded;
     public float GroundRestTimer => groundRestTimer;
     public float ResetGroundDuration => resetGroundDuration;
-    public bool IsDefusing => !isHeld && isGrounded && groundRestTimer < resetGroundDuration;
+    public bool IsDefusing => !isHeld && isGrounded && !hasDefusedThisDrop && currentTime < (maxTime - 0.05f) && groundRestTimer < resetGroundDuration;
 
     private void Awake()
     {
@@ -55,6 +62,22 @@ public class PlayerTimer : MonoBehaviour
         isHeld = startHeld;
 
         FindPlayer();
+    }
+
+    private void OnEnable()
+    {
+        GameManager.OnGameOver += HandleGameOver;
+    }
+
+    private void OnDisable()
+    {
+        GameManager.OnGameOver -= HandleGameOver;
+    }
+
+    private void HandleGameOver()
+    {
+        isExploded = true;
+        gameObject.SetActive(false);
     }
 
     private void Start()
@@ -67,11 +90,6 @@ public class PlayerTimer : MonoBehaviour
         if (playerTransform != null)
         {
             playerMovement = playerTransform.GetComponent<PlayerMovement>();
-            if (!playerScaleCached)
-            {
-                initialPlayerScale = playerTransform.localScale;
-                playerScaleCached = true;
-            }
             return;
         }
 
@@ -80,11 +98,6 @@ public class PlayerTimer : MonoBehaviour
         {
             playerTransform = player.transform;
             playerMovement = player.GetComponent<PlayerMovement>();
-            if (!playerScaleCached)
-            {
-                initialPlayerScale = playerTransform.localScale;
-                playerScaleCached = true;
-            }
         }
     }
 
@@ -93,16 +106,29 @@ public class PlayerTimer : MonoBehaviour
         if (isExploded) return;
         if (playerTransform == null) FindPlayer();
 
-        // Check if player has movement input or is moving
+        // Check if player has explicit movement input
         float moveX = Input.GetAxisRaw("Horizontal");
         if (moveX < 0f) moveX = 0f; // Ignore left input
         bool hasInput = moveX > 0.05f || Input.GetButton("Jump");
 
-        Rigidbody2D playerRb = (playerTransform != null) ? playerTransform.GetComponent<Rigidbody2D>() : null;
-        bool isPlayerMoving = playerRb != null && playerRb.linearVelocity.magnitude > 0.15f;
+        bool isPlayerGrounded = playerMovement != null ? playerMovement.IsGrounded : true;
+        bool isAirborne = !isPlayerGrounded;
         bool isIntroJumping = playerMovement != null && playerMovement.IsIntroJumping;
 
-        bool shouldHoldBomb = hasInput || isPlayerMoving || isIntroJumping;
+        // Check player speed & forcefully lock velocity to zero if no input on ground and speed < 0.5f
+        Rigidbody2D playerRb = (playerTransform != null) ? playerTransform.GetComponent<Rigidbody2D>() : null;
+        float playerSpeed = (playerRb != null) ? playerRb.linearVelocity.magnitude : 0f;
+
+        if (!hasInput && isPlayerGrounded && playerSpeed < 0.5f && playerRb != null)
+        {
+            playerRb.linearVelocity = Vector2.zero;
+            playerSpeed = 0f;
+        }
+
+        bool isPlayerTrulyStill = !hasInput && isPlayerGrounded && playerSpeed <= 0.05f;
+
+        // Player MUST hold bomb if not truly still, airborne (jumping/falling), or in intro jump
+        bool shouldHoldBomb = !isPlayerTrulyStill || isAirborne || isIntroJumping;
 
         // Auto PickUp when moving, Auto Drop when stopped
         if (shouldHoldBomb)
@@ -132,12 +158,23 @@ public class PlayerTimer : MonoBehaviour
 
             if (isGrounded)
             {
-                // Count up rest timer to 3 seconds on ground to reset bomb time
-                groundRestTimer += Time.deltaTime;
-
-                if (groundRestTimer >= resetGroundDuration)
+                if (!hasDefusedThisDrop && currentTime < maxTime - 0.05f)
                 {
+                    // Count up rest timer to 3 seconds on ground to reset bomb time
+                    groundRestTimer += Time.deltaTime;
+
+                    if (groundRestTimer >= resetGroundDuration)
+                    {
+                        currentTime = maxTime;
+                        groundRestTimer = 0f;
+                        hasDefusedThisDrop = true; // Stop defuse animation and forbid counting defuse rest timer again
+                    }
+                }
+                else
+                {
+                    // Defuse complete or full: LOCK currentTime at maxTime until player presses move input again!
                     currentTime = maxTime;
+                    groundRestTimer = 0f;
                 }
             }
             else
@@ -158,49 +195,57 @@ public class PlayerTimer : MonoBehaviour
     {
         if (playerTransform == null) return;
 
-        if (!playerScaleCached)
+        if (targetVisualTransform == null)
         {
-            initialPlayerScale = playerTransform.localScale;
-            playerScaleCached = true;
+            Transform v = playerTransform.Find("Visuals");
+            if (v == null)
+            {
+                SpriteRenderer sr = playerTransform.GetComponentInChildren<SpriteRenderer>();
+                if (sr != null) v = sr.transform;
+            }
+            targetVisualTransform = v != null ? v : playerTransform;
+        }
+
+        if (!visualScaleCached)
+        {
+            initialVisualScale = targetVisualTransform.localScale;
+            initialVisualLocalPos = targetVisualTransform.localPosition;
+            visualScaleCached = true;
         }
 
         bool isDefusingNow = IsDefusing;
-
-        if (playerAnimator == null && playerTransform != null)
-        {
-            playerAnimator = playerTransform.GetComponent<Animator>();
-            if (playerAnimator == null) playerAnimator = playerTransform.GetComponentInChildren<Animator>();
-        }
-
-        if (playerAnimator != null)
-        {
-            playerAnimator.SetBool(defuseAnimBoolName, isDefusingNow);
-        }
 
         if (enableProceduralDefuseAnim)
         {
             if (isDefusingNow)
             {
                 wasDefusing = true;
-                // Crouching defuse scale facing the bomb
-                Vector3 defuseScale = new Vector3(
-                    initialPlayerScale.x * defuseStretchX,
-                    initialPlayerScale.y * defuseSquashY,
-                    initialPlayerScale.z
-                );
+
+                if (enableScaleSquash)
+                {
+                    Vector3 defuseScale = new Vector3(
+                        initialVisualScale.x * defuseStretchX,
+                        initialVisualScale.y * defuseSquashY,
+                        initialVisualScale.z
+                    );
+                    Vector3 defuseLocalPos = initialVisualLocalPos + new Vector3(0f, defuseYOffset, 0f);
+                    targetVisualTransform.localScale = defuseScale;
+                    targetVisualTransform.localPosition = defuseLocalPos;
+                }
 
                 // Intense fast-hands defuse wiggle animation
                 float wiggleZ = Mathf.Sin(Time.time * defuseWiggleSpeed) * defuseWiggleAngle;
-
-                playerTransform.localScale = defuseScale;
-                playerTransform.localRotation = Quaternion.Euler(0f, 0f, wiggleZ);
+                targetVisualTransform.localRotation = Quaternion.Euler(0f, 0f, wiggleZ);
             }
             else if (wasDefusing)
             {
                 wasDefusing = false;
-                // Reset player scale and rotation back to normal
-                playerTransform.localScale = initialPlayerScale;
-                playerTransform.localRotation = Quaternion.identity;
+                if (enableScaleSquash)
+                {
+                    targetVisualTransform.localScale = initialVisualScale;
+                    targetVisualTransform.localPosition = initialVisualLocalPos;
+                }
+                targetVisualTransform.localRotation = Quaternion.identity;
             }
         }
     }
@@ -260,6 +305,7 @@ public class PlayerTimer : MonoBehaviour
     {
         isHeld = false;
         groundRestTimer = 0f;
+        hasDefusedThisDrop = false;
 
         if (playerTransform != null)
         {
@@ -280,6 +326,7 @@ public class PlayerTimer : MonoBehaviour
     {
         isHeld = true;
         groundRestTimer = 0f;
+        hasDefusedThisDrop = false;
         if (rb != null)
         {
             rb.simulated = false;
@@ -313,6 +360,30 @@ public class PlayerTimer : MonoBehaviour
     {
         isExploded = true;
         Debug.Log("<color=red>BOOM! Player Exploded!</color>");
+
+        // Play Explosion Particle Effect
+        if (explosionParticlePrefab == null)
+        {
+#if UNITY_EDITOR
+            explosionParticlePrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<ParticleSystem>("Assets/_Project/Prefabs/ExplosionParticle.prefab");
+#endif
+        }
+
+        Vector3 spawnPos = transform.position;
+        if (explosionParticlePrefab != null)
+        {
+            ParticleSystem exp = Instantiate(explosionParticlePrefab, spawnPos, Quaternion.identity);
+            exp.gameObject.SetActive(true);
+            exp.Play(true);
+            Destroy(exp.gameObject, 2.5f);
+        }
+        else
+        {
+            DustParticleEffects.PlayExplosion(spawnPos);
+        }
+
+        DustParticleEffects.PlayBloodSplatter(spawnPos);
+
         if (CameraFollow.Instance != null) CameraFollow.Instance.ShakeCamera(0.4f, 0.7f);
         gameObject.SetActive(false);
 

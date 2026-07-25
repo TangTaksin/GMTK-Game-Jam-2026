@@ -37,6 +37,15 @@ public class PlayerTimerUI : MonoBehaviour
 
     private void Update()
     {
+        if (GameManager.Instance != null && GameManager.Instance.IsGameOver)
+        {
+            if (timerText != null && timerText.gameObject.activeSelf)
+            {
+                timerText.gameObject.SetActive(false);
+            }
+            return;
+        }
+
         if (playerTimer == null || timerText == null)
         {
             playerTimer = FindAnyObjectByType<PlayerTimer>();
@@ -47,9 +56,9 @@ public class PlayerTimerUI : MonoBehaviour
         timerText.transform.position = playerTimer.transform.position + offset;
         timerText.transform.rotation = Quaternion.identity;
 
-        if (!playerTimer.IsHeld && playerTimer.IsGrounded)
+        if (playerTimer.IsDefusing)
         {
-            // Reset charging state on ground
+            // Reset charging state on ground while defusing
             float remainingRest = Mathf.Max(0f, playerTimer.ResetGroundDuration - playerTimer.GroundRestTimer);
             if (remainingRest > 0f)
             {

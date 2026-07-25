@@ -44,6 +44,18 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private Vector3 landPunchScale = new Vector3(0.25f, -0.2f, 0f);
     [SerializeField] private float juiceDuration = 0.2f;
 
+    [Header("Sprite Settings")]
+    [SerializeField] private SpriteRenderer spriteRenderer;
+    [SerializeField] private Sprite defaultSprite;
+    [SerializeField] private Sprite idleSprite;
+    [SerializeField] private Sprite jumpSprite;
+
+    [Header("Dust Particle Settings")]
+    [SerializeField] private bool enableDustParticles = true;
+    [SerializeField] private Vector3 feetOffset = new Vector3(0f, -0.5f, 0f);
+    [SerializeField] private ParticleSystem jumpDustPrefab;
+    [SerializeField] private ParticleSystem landDustPrefab;
+
     [Header("Jump Intro Settings")]
     [Tooltip("Enable jump intro animation when game starts.")]
     [SerializeField] private bool enableJumpIntro = true;
@@ -95,6 +107,20 @@ public class PlayerMovement : MonoBehaviour
         rb.interpolation = RigidbodyInterpolation2D.Interpolate;
         initialScale = transform.localScale;
         baseSpawnX = transform.position.x;
+
+        if (spriteRenderer == null)
+        {
+            spriteRenderer = GetComponent<SpriteRenderer>();
+            if (spriteRenderer == null)
+            {
+                spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            }
+        }
+
+        if (spriteRenderer != null && defaultSprite == null)
+        {
+            defaultSprite = spriteRenderer.sprite;
+        }
     }
 
     private void OnEnable()
@@ -123,6 +149,7 @@ public class PlayerMovement : MonoBehaviour
         {
             rb.linearVelocity = Vector2.zero;
             rb.angularVelocity = 0f;
+            rb.simulated = false;
         }
 
         // Hide sprite renderers on Player and child objects (e.g. Visuals)
@@ -177,6 +204,13 @@ public class PlayerMovement : MonoBehaviour
         currentJumpXOffset = startXOffset;
         currentJumpPitch = jumpPitchAngle;
 
+        PlayJumpDust();
+
+        if (spriteRenderer != null && jumpSprite != null)
+        {
+            spriteRenderer.sprite = jumpSprite;
+        }
+
         rb.bodyType = RigidbodyType2D.Kinematic;
         rb.linearVelocity = Vector2.zero;
         rb.angularVelocity = 0f;
@@ -229,6 +263,12 @@ public class PlayerMovement : MonoBehaviour
         rb.angularVelocity = 0f;
 
         TriggerJuice(landPunchScale);
+        PlayLandDust();
+
+        if (spriteRenderer != null && defaultSprite != null)
+        {
+            spriteRenderer.sprite = defaultSprite;
+        }
 
         if (CameraFollow.Instance != null)
         {
@@ -273,9 +313,49 @@ public class PlayerMovement : MonoBehaviour
         transform.DOPunchScale(punchAmount, juiceDuration, 6, 0.5f);
     }
 
+    private void PlayJumpDust()
+    {
+        if (!enableDustParticles) return;
+        Vector3 spawnPos = transform.position + feetOffset;
+        if (jumpDustPrefab != null)
+        {
+            ParticleSystem ps = Instantiate(jumpDustPrefab, spawnPos, Quaternion.identity);
+            ps.Play();
+            Destroy(ps.gameObject, ps.main.duration + ps.main.startLifetime.constantMax);
+        }
+        else
+        {
+            DustParticleEffects.PlayJumpDust(spawnPos);
+        }
+    }
+
+    private void PlayLandDust()
+    {
+        if (!enableDustParticles) return;
+        Vector3 spawnPos = transform.position + feetOffset;
+        if (landDustPrefab != null)
+        {
+            ParticleSystem ps = Instantiate(landDustPrefab, spawnPos, Quaternion.identity);
+            ps.Play();
+            Destroy(ps.gameObject, ps.main.duration + ps.main.startLifetime.constantMax);
+        }
+        else
+        {
+            DustParticleEffects.PlayLandDust(spawnPos);
+        }
+    }
+
     private void Update()
     {
-        if (isIntroJumping) return;
+        if (isIntroJumping)
+        {
+            if (spriteRenderer != null && jumpSprite != null)
+            {
+                spriteRenderer.sprite = jumpSprite;
+            }
+            return;
+        }
+
         if (GameManager.Instance != null && GameManager.Instance.IsGameOver) return;
 
         if (Input.GetButtonDown("Jump"))
@@ -285,6 +365,36 @@ public class PlayerMovement : MonoBehaviour
         else
         {
             jumpBufferTimer -= Time.deltaTime;
+        }
+
+        UpdateSprite();
+    }
+
+    private void UpdateSprite()
+    {
+        if (spriteRenderer == null) return;
+
+        if (!isGrounded)
+        {
+            if (jumpSprite != null)
+            {
+                spriteRenderer.sprite = jumpSprite;
+            }
+        }
+        else
+        {
+            float moveInput = Input.GetAxisRaw("Horizontal");
+            float speed = rb != null ? Mathf.Abs(rb.linearVelocity.x) : 0f;
+            bool isIdle = Mathf.Approximately(moveInput, 0f) && speed < 0.1f;
+
+            if (isIdle && idleSprite != null)
+            {
+                spriteRenderer.sprite = idleSprite;
+            }
+            else if (defaultSprite != null)
+            {
+                spriteRenderer.sprite = defaultSprite;
+            }
         }
     }
 
@@ -330,6 +440,11 @@ public class PlayerMovement : MonoBehaviour
             if (!isGrounded)
             {
                 TriggerJuice(landPunchScale);
+                PlayLandDust();
+                if (spriteRenderer != null && defaultSprite != null)
+                {
+                    spriteRenderer.sprite = defaultSprite;
+                }
             }
 
             isGrounded = true;
@@ -382,6 +497,12 @@ public class PlayerMovement : MonoBehaviour
 
             // Trigger Jump Stretch Visual Feedback
             TriggerJuice(jumpPunchScale);
+            PlayJumpDust();
+
+            if (spriteRenderer != null && jumpSprite != null)
+            {
+                spriteRenderer.sprite = jumpSprite;
+            }
 
             // Launch direction blends Upward force with current slope normal
             Vector2 jumpDir = (Vector2.up * 0.8f + groundNormal * 0.2f).normalized;

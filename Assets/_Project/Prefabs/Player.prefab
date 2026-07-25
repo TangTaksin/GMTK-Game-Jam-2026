@@ -488,7 +488,7 @@ CircleCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Radius: 0.34
+  m_Radius: 0.31
 --- !u!50 &5738286687874603506
 Rigidbody2D:
   serializedVersion: 5
@@ -558,6 +558,14 @@ MonoBehaviour:
   jumpPunchScale: {x: -0.15, y: 0.25, z: 0}
   landPunchScale: {x: 0.25, y: -0.2, z: 0}
   juiceDuration: 0.2
+  spriteRenderer: {fileID: 0}
+  defaultSprite: {fileID: 0}
+  idleSprite: {fileID: 0}
+  jumpSprite: {fileID: 0}
+  enableDustParticles: 1
+  feetOffset: {x: 0, y: -0.5, z: 0}
+  jumpDustPrefab: {fileID: 1229810220630162446, guid: 803d59a282f47ef47805a4d1a4ff2b9f, type: 3}
+  landDustPrefab: {fileID: 6126299654755484747, guid: 510e305193f6fe6458d53ed965da62d7, type: 3}
   enableJumpIntro: 1
   jumpIntroDelay: 2
   jumpHeight: 3
