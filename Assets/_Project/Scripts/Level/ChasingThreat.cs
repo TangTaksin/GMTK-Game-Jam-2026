@@ -53,6 +53,10 @@ public class ChasingThreat : MonoBehaviour
     [SerializeField] private Ease jumpUpEase = Ease.OutQuad;
     [SerializeField] private Ease jumpDownEase = Ease.InQuad;
 
+    [Header("VFX / Hit Settings")]
+    [SerializeField] private ParticleSystem bloodParticlePrefab;
+    [SerializeField] private ParticleSystem landDustPrefab;
+
     [Header("Game Over Retreat Settings")]
     [Tooltip("Enable retreat (turn Y 180° and move left) when game over occurs.")]
     [SerializeField] private bool retreatOnGameOver = true;
@@ -291,6 +295,29 @@ public class ChasingThreat : MonoBehaviour
         });
     }
 
+    private void PlayLandDust()
+    {
+        Vector3 spawnPos = transform.position + new Vector3(0f, -0.5f, 0f);
+        if (landDustPrefab == null)
+        {
+#if UNITY_EDITOR
+            landDustPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<ParticleSystem>("Assets/_Project/Prefabs/LandDustParticle.prefab");
+#endif
+        }
+
+        if (landDustPrefab != null)
+        {
+            ParticleSystem ps = Instantiate(landDustPrefab, spawnPos, Quaternion.identity);
+            ps.gameObject.SetActive(true);
+            ps.Play();
+            Destroy(ps.gameObject, 2.0f);
+        }
+        else
+        {
+            DustParticleEffects.PlayLandDust(spawnPos);
+        }
+    }
+
     private void OnJumpLand()
     {
         if (rb != null)
@@ -299,6 +326,8 @@ public class ChasingThreat : MonoBehaviour
             rb.linearVelocity = Vector2.zero;
             rb.angularVelocity = 0f;
         }
+
+        PlayLandDust();
         if (CameraFollow.Instance != null)
         {
             CameraFollow.Instance.ShakeCamera(0.2f, 0.35f);
@@ -532,6 +561,27 @@ public class ChasingThreat : MonoBehaviour
         if (target.CompareTag(playerTag) || target.GetComponent<PlayerMovement>() != null)
         {
             Debug.Log("<color=red>[ChasingThreat] Player caught by threat!</color>");
+
+            Vector3 hitPos = target.transform.position;
+
+            if (bloodParticlePrefab == null)
+            {
+#if UNITY_EDITOR
+                bloodParticlePrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<ParticleSystem>("Assets/_Project/Prefabs/BloodParticle.prefab");
+#endif
+            }
+
+            if (bloodParticlePrefab != null)
+            {
+                ParticleSystem b = Instantiate(bloodParticlePrefab, hitPos, Quaternion.identity);
+                b.gameObject.SetActive(true);
+                b.Play();
+                Destroy(b.gameObject, 2.0f);
+            }
+            else
+            {
+                DustParticleEffects.PlayBloodSplatter(hitPos);
+            }
 
             PlayerTimer playerTimer = target.GetComponent<PlayerTimer>();
             if (playerTimer != null)

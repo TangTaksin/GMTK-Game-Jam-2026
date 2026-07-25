@@ -80,9 +80,9 @@ SpriteRenderer:
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
   m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 1447054521
-  m_SortingLayer: 2
-  m_SortingOrder: 0
+  m_SortingLayerID: 960792593
+  m_SortingLayer: 3
+  m_SortingOrder: 5
   m_MaskInteraction: 0
   m_Sprite: {fileID: -6325241665476540349, guid: 7d45bd41dc310794c87b9aaccfe6e400, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -205,6 +205,8 @@ MonoBehaviour:
   jumpPitchAngle: 20
   jumpUpEase: 6
   jumpDownEase: 5
+  bloodParticlePrefab: {fileID: 0}
+  landDustPrefab: {fileID: 0}
   retreatOnGameOver: 1
   retreatSpeed: 6
   retreatTurnDuration: 0.35
