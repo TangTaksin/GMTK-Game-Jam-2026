@@ -37,6 +37,26 @@ public class ControlsTutorialUI : MonoBehaviour
         SetText(tutorialContent);
     }
 
+    private void OnEnable()
+    {
+        GameManager.OnGameOver += HandleGameOver;
+    }
+
+    private void OnDisable()
+    {
+        GameManager.OnGameOver -= HandleGameOver;
+    }
+
+    private void HandleGameOver()
+    {
+        HideTutorialUI();
+    }
+
+    public void HideTutorialUI()
+    {
+        gameObject.SetActive(false);
+    }
+
     private void Start()
     {
         SetText(tutorialContent);
@@ -49,6 +69,12 @@ public class ControlsTutorialUI : MonoBehaviour
 
     private void Update()
     {
+        if (GameManager.Instance != null && GameManager.Instance.IsGameOver)
+        {
+            HideTutorialUI();
+            return;
+        }
+
         if (!fadeOutOnMove) return;
 
         // Detect player movement input
