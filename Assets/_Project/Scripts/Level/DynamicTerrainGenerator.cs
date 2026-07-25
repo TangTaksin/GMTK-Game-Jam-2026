@@ -52,6 +52,28 @@ public class DynamicTerrainGenerator : MonoBehaviour
     [Tooltip("Sorting order for ground fill mesh renderer (behind surface line).")]
     [SerializeField] private int groundSortingOrder = 0;
 
+    [Header("Dynamic Procedural Water Generation")]
+    [Tooltip("Enable procedural water generation along with dynamic terrain.")]
+    [SerializeField] private bool enableWater = true;
+
+    [Tooltip("Height level of the water surface (Y axis).")]
+    [SerializeField] private float waterLevelY = -1.5f;
+
+    [Tooltip("Depth of the water body downwards.")]
+    [SerializeField] private float waterDepth = 12.0f;
+
+    [Tooltip("Only fill water in valley depressions below water level Y (True), or continuous water layer (False).")]
+    [SerializeField] private bool fillValleysOnly = false;
+
+    [Tooltip("Material using SimpleWaterShader. If null, automatically searches for Custom/SimpleWaterShader.")]
+    [SerializeField] private Material waterMaterial;
+
+    [Tooltip("Sorting layer for water mesh renderer.")]
+    [SerializeField] private string waterSortingLayer = "Default";
+
+    [Tooltip("Sorting order for water mesh renderer (rendered above ground mesh).")]
+    [SerializeField] private int waterSortingOrder = 2;
+
     [Header("Pacing & Safe Flat Zones")]
     [Tooltip("Guaranteed 100% flat ground distance around player spawn (e.g. up to X = 15).")]
     [SerializeField] private float initialSafeZoneEnd = 15.0f;
@@ -121,6 +143,11 @@ public class DynamicTerrainGenerator : MonoBehaviour
     private Mesh groundMesh;
     private Transform leftWallTransform;
 
+    // Water Mesh references
+    private MeshFilter waterMeshFilter;
+    private MeshRenderer waterMeshRenderer;
+    private Mesh waterMesh;
+
     // Pre-allocated collections to minimize GC allocations
     private readonly List<Vector2> points = new List<Vector2>(128);
     private readonly List<Vector2> localPoints = new List<Vector2>(128);
@@ -165,6 +192,7 @@ public class DynamicTerrainGenerator : MonoBehaviour
         }
 
         SetupGroundMaterial();
+        SetupWaterMeshObject();
 
         seed = Random.Range(0f, 1000f);
     }
@@ -454,6 +482,9 @@ public class DynamicTerrainGenerator : MonoBehaviour
         // Update solid ground mesh fill below surface line
         UpdateGroundMesh(count);
 
+        // Update dynamic water mesh fill
+        UpdateWaterMesh(count);
+
         // Dynamic safety wall trailing at the leftmost edge of existing terrain
         if (createLeftWall && leftWallTransform != null && !enableChasingThreat)
         {
@@ -490,6 +521,60 @@ public class DynamicTerrainGenerator : MonoBehaviour
 
         meshRenderer.sortingLayerName = groundSortingLayer;
         meshRenderer.sortingOrder = groundSortingOrder;
+    }
+
+    private void SetupWaterMeshObject()
+    {
+        if (!enableWater) return;
+
+        Transform waterChild = transform.Find("ProceduralWaterMesh");
+        GameObject waterObj;
+        if (waterChild != null)
+        {
+            waterObj = waterChild.gameObject;
+        }
+        else
+        {
+            waterObj = new GameObject("ProceduralWaterMesh");
+            waterObj.transform.SetParent(transform, false);
+        }
+
+        waterMeshFilter = waterObj.GetComponent<MeshFilter>();
+        if (waterMeshFilter == null) waterMeshFilter = waterObj.AddComponent<MeshFilter>();
+
+        waterMeshRenderer = waterObj.GetComponent<MeshRenderer>();
+        if (waterMeshRenderer == null) waterMeshRenderer = waterObj.AddComponent<MeshRenderer>();
+
+        if (waterMesh == null)
+        {
+            waterMesh = new Mesh();
+            waterMesh.name = "WaterProceduralMesh";
+            waterMeshFilter.sharedMesh = waterMesh;
+        }
+
+        SetupWaterMaterial();
+    }
+
+    private void SetupWaterMaterial()
+    {
+        if (waterMeshRenderer == null) return;
+
+        if (waterMaterial != null)
+        {
+            waterMeshRenderer.sharedMaterial = waterMaterial;
+        }
+        else
+        {
+            Shader waterShader = Shader.Find("Custom/SimpleWaterShader");
+            if (waterShader != null)
+            {
+                Material mat = new Material(waterShader);
+                waterMeshRenderer.sharedMaterial = mat;
+            }
+        }
+
+        waterMeshRenderer.sortingLayerName = waterSortingLayer;
+        waterMeshRenderer.sortingOrder = waterSortingOrder;
     }
 
     private void UpdateGroundMesh(int count)
@@ -537,6 +622,63 @@ public class DynamicTerrainGenerator : MonoBehaviour
         groundMesh.uv = uvs;
         groundMesh.triangles = tris;
         groundMesh.RecalculateBounds();
+    }
+
+    private void UpdateWaterMesh(int count)
+    {
+        if (!enableWater || count < 2)
+        {
+            if (waterMeshRenderer != null) waterMeshRenderer.enabled = false;
+            return;
+        }
+
+        if (waterMeshRenderer != null) waterMeshRenderer.enabled = true;
+        if (waterMesh == null) return;
+
+        float bottomY = waterLevelY - waterDepth;
+
+        Vector3[] verts = new Vector3[count * 2];
+        Vector2[] uvs = new Vector2[count * 2];
+        int[] tris = new int[(count - 1) * 6];
+
+        for (int i = 0; i < count; i++)
+        {
+            Vector2 p = points[i];
+
+            float topY = fillValleysOnly ? Mathf.Min(p.y, waterLevelY) : waterLevelY;
+            float bY = fillValleysOnly ? Mathf.Min(p.y, bottomY) : bottomY;
+
+            // Z = -0.05f to render slightly in front of solid ground fill mesh
+            verts[i * 2] = new Vector3(p.x, topY, -0.05f);
+            verts[i * 2 + 1] = new Vector3(p.x, bY, -0.05f);
+
+            float vTop = Mathf.Clamp01((topY - bottomY) / Mathf.Max(0.01f, waterDepth));
+            uvs[i * 2] = new Vector2(p.x * 0.1f, vTop);
+            uvs[i * 2 + 1] = new Vector2(p.x * 0.1f, 0.0f);
+        }
+
+        int triIndex = 0;
+        for (int i = 0; i < count - 1; i++)
+        {
+            int topL = i * 2;
+            int botL = i * 2 + 1;
+            int topR = (i + 1) * 2;
+            int botR = (i + 1) * 2 + 1;
+
+            tris[triIndex++] = topL;
+            tris[triIndex++] = topR;
+            tris[triIndex++] = botL;
+
+            tris[triIndex++] = botL;
+            tris[triIndex++] = topR;
+            tris[triIndex++] = botR;
+        }
+
+        waterMesh.Clear();
+        waterMesh.vertices = verts;
+        waterMesh.uv = uvs;
+        waterMesh.triangles = tris;
+        waterMesh.RecalculateBounds();
     }
 }
 

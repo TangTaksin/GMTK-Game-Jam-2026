@@ -31,6 +31,10 @@ public class CameraFollow : MonoBehaviour
     [SerializeField] private float maxZoomSpeed = 22f;
     [SerializeField] private float zoomSmoothSpeed = 2f;
 
+    [Header("Intro Camera Settings")]
+    [Tooltip("If true, camera stays fixed at spawn position until player intro jump finishes.")]
+    [SerializeField] private bool lockDuringIntro = true;
+
     private Rigidbody2D targetRb;
     private PlayerMovement targetMovement;
     private Camera cam;
@@ -50,6 +54,19 @@ public class CameraFollow : MonoBehaviour
         if (target != null)
         {
             InitTargetComponents();
+        }
+    }
+
+    private void Start()
+    {
+        if (target != null)
+        {
+            Vector3 startPos = target.position + baseOffset;
+            if (DynamicTerrainGenerator.Instance != null)
+            {
+                startPos.y = DynamicTerrainGenerator.Instance.CalculateHeightAt(target.position.x) + baseOffset.y;
+            }
+            transform.position = startPos;
         }
     }
 
@@ -87,6 +104,12 @@ public class CameraFollow : MonoBehaviour
         if (targetRb == null || targetMovement == null)
         {
             InitTargetComponents();
+        }
+
+        // Lock camera position during player intro jump
+        if (lockDuringIntro && targetMovement != null && targetMovement.IsIntroJumping)
+        {
+            return;
         }
 
         Vector3 targetPos = target.position + baseOffset;

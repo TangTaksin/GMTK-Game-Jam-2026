@@ -44,6 +44,26 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private Vector3 landPunchScale = new Vector3(0.25f, -0.2f, 0f);
     [SerializeField] private float juiceDuration = 0.2f;
 
+    [Header("Jump Intro Settings")]
+    [Tooltip("Enable jump intro animation when game starts.")]
+    [SerializeField] private bool enableJumpIntro = true;
+    [Tooltip("Delay in seconds before starting the jump intro animation (Set lower than ChasingThreat so player jumps first).")]
+    [SerializeField] private float jumpIntroDelay = 0.05f;
+    [Tooltip("Peak jump height above ground surface.")]
+    [SerializeField] private float jumpHeight = 3.5f;
+    [Tooltip("Initial Y offset below ground surface before jump.")]
+    [SerializeField] private float startYOffset = -5.0f;
+    [Tooltip("Initial X offset relative to starting position.")]
+    [SerializeField] private float startXOffset = -3.0f;
+    [Tooltip("Landing X offset relative to starting position (0 = land on spawn position).")]
+    [SerializeField] private float landingXOffset = 0.0f;
+    [Tooltip("Total duration of jump animation in seconds.")]
+    [SerializeField] private float jumpDuration = 0.85f;
+    [Tooltip("Rotation pitch effect during jump (degrees).")]
+    [SerializeField] private float jumpPitchAngle = 20f;
+    [SerializeField] private Ease jumpUpEase = Ease.OutQuad;
+    [SerializeField] private Ease jumpDownEase = Ease.InQuad;
+
     private Rigidbody2D rb;
     private bool jumpRequested;
     private int jumpsRemaining;
@@ -57,19 +77,138 @@ public class PlayerMovement : MonoBehaviour
     private Vector2 lastSlopeTangent = Vector2.right;
     private Vector3 initialScale = Vector3.one;
 
+    // Intro Jump State Variables
+    private bool isIntroJumping;
+    private float baseSpawnX;
+    private float currentJumpYOffset;
+    private float currentJumpXOffset;
+    private float currentJumpPitch;
+    private Sequence jumpSequence;
+
     public bool IsGrounded => isGrounded;
     public Vector2 GroundNormal => groundNormal;
+    public bool IsIntroJumping => isIntroJumping;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         rb.interpolation = RigidbodyInterpolation2D.Interpolate;
         initialScale = transform.localScale;
+        baseSpawnX = transform.position.x;
+    }
+
+    private void Start()
+    {
+        baseSpawnX = transform.position.x;
+        if (enableJumpIntro)
+        {
+            TriggerJumpIntro();
+        }
     }
 
     private void OnDestroy()
     {
+        jumpSequence?.Kill();
         transform.DOKill();
+    }
+
+    public void TriggerJumpIntro()
+    {
+        if (!enableJumpIntro) return;
+
+        jumpSequence?.Kill();
+
+        isIntroJumping = true;
+        currentJumpYOffset = startYOffset;
+        currentJumpXOffset = startXOffset;
+        currentJumpPitch = jumpPitchAngle;
+
+        rb.bodyType = RigidbodyType2D.Kinematic;
+        rb.linearVelocity = Vector2.zero;
+        rb.angularVelocity = 0f;
+
+        UpdateIntroPosition();
+
+        jumpSequence = DOTween.Sequence().SetLink(gameObject);
+
+        if (jumpIntroDelay > 0f)
+        {
+            jumpSequence.AppendInterval(jumpIntroDelay);
+        }
+
+        float upDuration = jumpDuration * 0.45f;
+        float downDuration = jumpDuration * 0.55f;
+
+        jumpSequence.Append(
+            DOVirtual.Float(startYOffset, jumpHeight, upDuration, y => currentJumpYOffset = y)
+                .SetEase(jumpUpEase)
+        );
+        jumpSequence.Join(
+            DOVirtual.Float(startXOffset, landingXOffset, jumpDuration, x => currentJumpXOffset = x)
+                .SetEase(Ease.OutQuad)
+        );
+        jumpSequence.Join(
+            DOVirtual.Float(jumpPitchAngle, -jumpPitchAngle, jumpDuration, pitch => currentJumpPitch = pitch)
+                .SetEase(Ease.InOutSine)
+        );
+        jumpSequence.Append(
+            DOVirtual.Float(jumpHeight, 0f, downDuration, y => currentJumpYOffset = y)
+                .SetEase(jumpDownEase)
+        );
+
+        jumpSequence.OnComplete(() =>
+        {
+            OnIntroJumpLand();
+        });
+    }
+
+    private void OnIntroJumpLand()
+    {
+        isIntroJumping = false;
+        baseSpawnX += landingXOffset;
+        currentJumpYOffset = 0f;
+        currentJumpXOffset = 0f;
+        currentJumpPitch = 0f;
+
+        rb.bodyType = RigidbodyType2D.Dynamic;
+        rb.linearVelocity = Vector2.zero;
+        rb.angularVelocity = 0f;
+
+        TriggerJuice(landPunchScale);
+
+        if (CameraFollow.Instance != null)
+        {
+            CameraFollow.Instance.ShakeCamera(0.2f, 0.35f);
+        }
+    }
+
+    private void UpdateIntroPosition()
+    {
+        if (!isIntroJumping) return;
+
+        float targetX = baseSpawnX + currentJumpXOffset;
+        float groundY = transform.position.y;
+        if (DynamicTerrainGenerator.Instance != null)
+        {
+            groundY = DynamicTerrainGenerator.Instance.CalculateHeightAt(targetX);
+        }
+        float targetY = groundY + currentJumpYOffset;
+
+        rb.MovePosition(new Vector2(targetX, targetY));
+
+        // Pitch & slope angle rotation during jump intro
+        float slopeAngle = 0f;
+        if (DynamicTerrainGenerator.Instance != null)
+        {
+            float delta = 0.5f;
+            float yLeft = DynamicTerrainGenerator.Instance.CalculateHeightAt(targetX - delta);
+            float yRight = DynamicTerrainGenerator.Instance.CalculateHeightAt(targetX + delta);
+            Vector2 slopeTangent = new Vector2(delta * 2f, yRight - yLeft).normalized;
+            slopeAngle = Mathf.Atan2(slopeTangent.y, slopeTangent.x) * Mathf.Rad2Deg;
+        }
+
+        float finalAngle = slopeAngle + currentJumpPitch;
+        rb.MoveRotation(finalAngle);
     }
 
     private void TriggerJuice(Vector3 punchAmount)
@@ -82,6 +221,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
+        if (isIntroJumping) return;
+
         if (Input.GetButtonDown("Jump"))
         {
             jumpBufferTimer = jumpBufferTime;
@@ -160,6 +301,12 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (isIntroJumping)
+        {
+            UpdateIntroPosition();
+            return;
+        }
+
         CheckGrounded();
 
         // 1. Jump Execution with Coyote Time & Jump Buffer
@@ -302,8 +449,6 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-
-
     private void OnDrawGizmosSelected()
     {
         Vector3 leftOrigin = transform.position + Vector3.left * groundCheckWidth;
@@ -340,6 +485,26 @@ public class PlayerMovement : MonoBehaviour
             Gizmos.color = Color.yellow;
             Gizmos.DrawRay(transform.position, downhillTangent * 1.5f);
         }
+
+        // Draw Jump Intro Start and Landing Gizmos
+        if (enableJumpIntro)
+        {
+            float targetBaseX = Application.isPlaying ? baseSpawnX : transform.position.x;
+            float targetLandingX = targetBaseX + landingXOffset;
+            float targetStartX = targetBaseX + startXOffset;
+
+            Gizmos.color = Color.yellow;
+            Vector3 landingGizmoPos = new Vector3(targetLandingX, transform.position.y, transform.position.z);
+            if (DynamicTerrainGenerator.Instance != null)
+            {
+                landingGizmoPos.y = DynamicTerrainGenerator.Instance.CalculateHeightAt(targetLandingX);
+            }
+            Gizmos.DrawWireCube(landingGizmoPos, new Vector3(0.8f, 0.8f, 0f));
+
+            Gizmos.color = Color.cyan;
+            Vector3 startGizmoPos = new Vector3(targetStartX, landingGizmoPos.y + startYOffset, transform.position.z);
+            Gizmos.DrawWireSphere(startGizmoPos, 0.3f);
+            Gizmos.DrawLine(startGizmoPos, landingGizmoPos);
+        }
     }
 }
-

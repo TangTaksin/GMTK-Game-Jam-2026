@@ -34,6 +34,7 @@ public class PlayerTimer : MonoBehaviour
     private void Update()
     {
         if (isExploded) return;
+        if (playerMovement != null && playerMovement.IsIntroJumping) return;
 
         CheckGrounded();
         bool isCompletelySafe = IsSafeAndStopped();
