@@ -95,7 +95,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  - {fileID: -8091914061032239488, guid: cd9e7e4a22e330246ab0bab5f1d76108, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -141,8 +141,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 10
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: cd9e7e4a22e330246ab0bab5f1d76108, type: 2}
+  m_sharedMaterial: {fileID: -8091914061032239488, guid: cd9e7e4a22e330246ab0bab5f1d76108, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -166,8 +166,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 3
-  m_fontSizeBase: 3
+  m_fontSize: 3.76
+  m_fontSizeBase: 3.76
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -226,9 +226,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a127474f262242a4ab7abbfb064e7d02, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Project.Player.PlayerTimerUI
-  playerTimer: {fileID: 6720383037309360983}
+  playerTimer: {fileID: 0}
   timerText: {fileID: 3633704938989229006}
   offset: {x: 0, y: 0.5, z: 0}
+  normalColor: {r: 0, g: 0, b: 0, a: 1}
+  warningColor: {r: 1, g: 0, b: 0, a: 1}
+  resetColor: {r: 0, g: 1, b: 0, a: 1}
 --- !u!1 &6439424279058033230
 GameObject:
   m_ObjectHideFlags: 0
@@ -425,7 +428,6 @@ GameObject:
   - component: {fileID: 7011003348324694081}
   - component: {fileID: 5738286687874603506}
   - component: {fileID: 279364951642408316}
-  - component: {fileID: 6720383037309360983}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -538,9 +540,13 @@ MonoBehaviour:
     m_Bits: 8
   groundCheckDistance: 0.6
   groundCheckWidth: 0.4
+  coyoteTime: 0.15
+  jumpBufferTime: 0.15
   rotateToSlope: 1
   slopeRotationSpeed: 20
   maxSlopeAngle: 60
+  slopeSnapForce: 15
+  rampLaunchMultiplier: 1.25
   rotateInAir: 1
   airRotationSpeed: 8
   maxAirPitchDown: -60
@@ -548,24 +554,17 @@ MonoBehaviour:
   flatGroundBrake: 5
   negativeVelStopDuration: 0.3
   negativeVelBrakeForce: 30
---- !u!114 &6720383037309360983
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7483773572894319829}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8527474f262242a4ab7abbfb064e7d02, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerTimer
-  maxTime: 30
-  currentTime: 0
-  stopSpeedThreshold: 0.4
-  stopAngularSpeedThreshold: 1
-  maxFlatAngle: 20
-  groundLayer:
-    serializedVersion: 2
-    m_Bits: 8
-  groundCheckDistance: 0.6
+  enableJuice: 1
+  jumpPunchScale: {x: -0.15, y: 0.25, z: 0}
+  landPunchScale: {x: 0.25, y: -0.2, z: 0}
+  juiceDuration: 0.2
+  enableJumpIntro: 1
+  jumpIntroDelay: 2
+  jumpHeight: 3
+  startYOffset: -1.6
+  startXOffset: -11.78
+  landingXOffset: 0
+  jumpDuration: 0.6
+  jumpPitchAngle: 40
+  jumpUpEase: 6
+  jumpDownEase: 5
