@@ -58,10 +58,10 @@ Material:
     - _ZWrite: 0
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _DeepColor: {r: 0.05, g: 0.25, b: 0.55, a: 0.95}
-    - _FoamColor: {r: 0.9, g: 0.98, b: 1, a: 0.9}
+    - _DeepColor: {r: 0.14117648, g: 0.1882353, b: 0.3019608, a: 0.95}
+    - _FoamColor: {r: 0.4862745, g: 0.6039216, b: 0.7607843, a: 0.9}
     - _GlintColor: {r: 0.554717, g: 0.554717, b: 0.554717, a: 0.38039216}
     - _RendererColor: {r: 1, g: 1, b: 1, a: 1}
-    - _ShallowColor: {r: 0.25, g: 0.8, b: 0.95, a: 0.85}
+    - _ShallowColor: {r: 0.16078432, g: 0.24313726, b: 0.34509805, a: 0.85}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
