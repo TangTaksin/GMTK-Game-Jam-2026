@@ -9,11 +9,16 @@ public class GameManager : MonoBehaviour
     [SerializeField] private KeyCode restartKey = KeyCode.R;
     [SerializeField] private bool allowRestartAnytime = false;
 
+    [Header("Start Menu Settings")]
+    [SerializeField] private bool useStartMenu = true;
+
     [Header("Game Over UI (Optional)")]
     [SerializeField] private GameObject gameOverUI;
 
     public bool IsGameOver { get; private set; }
+    public bool IsGameStarted { get; private set; }
 
+    public static event System.Action OnGameStart;
     public static event System.Action OnGameOver;
     public static event System.Action OnGameRestart;
 
@@ -25,6 +30,11 @@ public class GameManager : MonoBehaviour
             return;
         }
         Instance = this;
+
+        if (!useStartMenu)
+        {
+            IsGameStarted = true;
+        }
     }
 
     private void Update()
@@ -34,6 +44,18 @@ public class GameManager : MonoBehaviour
         {
             RestartLevel();
         }
+    }
+
+    /// <summary>
+    /// Call this to start the game when user clicks on the start menu.
+    /// </summary>
+    public void StartGame()
+    {
+        if (IsGameStarted) return;
+
+        IsGameStarted = true;
+        Debug.Log("<color=green>[GameManager] Game Started!</color>");
+        OnGameStart?.Invoke();
     }
 
     /// <summary>

@@ -97,10 +97,44 @@ public class PlayerMovement : MonoBehaviour
         baseSpawnX = transform.position.x;
     }
 
+    private void OnEnable()
+    {
+        GameManager.OnGameStart += HandleGameStart;
+    }
+
+    private void OnDisable()
+    {
+        GameManager.OnGameStart -= HandleGameStart;
+    }
+
+    private void HandleGameStart()
+    {
+        if (enableJumpIntro)
+        {
+            TriggerJumpIntro();
+        }
+    }
+
     private void Start()
     {
         baseSpawnX = transform.position.x;
-        if (enableJumpIntro)
+        if (GameManager.Instance != null && !GameManager.Instance.IsGameStarted)
+        {
+            if (enableJumpIntro)
+            {
+                isIntroJumping = true;
+                currentJumpYOffset = startYOffset;
+                currentJumpXOffset = startXOffset;
+                currentJumpPitch = jumpPitchAngle;
+
+                rb.bodyType = RigidbodyType2D.Kinematic;
+                rb.linearVelocity = Vector2.zero;
+                rb.angularVelocity = 0f;
+
+                UpdateIntroPosition();
+            }
+        }
+        else if (enableJumpIntro)
         {
             TriggerJumpIntro();
         }

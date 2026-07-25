@@ -3,6 +3,7 @@ using TMPro;
 
 /// <summary>
 /// Displays controls tutorial text using TextMeshPro (World Space or Canvas UI).
+/// Hides during menu and shows when game starts.
 /// </summary>
 public class ControlsTutorialUI : MonoBehaviour
 {
@@ -17,11 +18,10 @@ public class ControlsTutorialUI : MonoBehaviour
     [Header("Tutorial Text Format")]
     [TextArea(6, 12)]
     [SerializeField] private string tutorialContent =
-        "<b><color=#FFD700>[ CONTROLS ]</color></b>\n" +
-        "• <b>D</b> or <b><color=#00FFFF>→</color></b> : Move Right\n" +
-        "• <b>Spacebar</b> : Jump / Double Jump\n" +
-        "• <b>Release Keys on Flat Ground</b> : Stop & Reset Timer!\n" +
-        "  <i>(Come to a complete stop before you explode)</i>";
+        "<b><color=#FFD700>[ CONTROLS & BOMB ]</color></b>\n" +
+        "• <b>D</b> / <b><color=#00FFFF>→</color></b> / <b>Space</b> : Move & Hold Bomb (Timer Ticks!)\n" +
+        "• <b>Stop Moving & Rest (3s)</b> : Auto-Drop Bomb & Reset Timer!\n" +
+        "  <i>(Stop on flat ground to charge timer before it explodes)</i>";
 
     private CanvasGroup canvasGroup;
     private bool playerHasMoved;
@@ -39,11 +39,13 @@ public class ControlsTutorialUI : MonoBehaviour
 
     private void OnEnable()
     {
+        GameManager.OnGameStart += ShowTutorialUI;
         GameManager.OnGameOver += HandleGameOver;
     }
 
     private void OnDisable()
     {
+        GameManager.OnGameStart -= ShowTutorialUI;
         GameManager.OnGameOver -= HandleGameOver;
     }
 
@@ -52,14 +54,57 @@ public class ControlsTutorialUI : MonoBehaviour
         HideTutorialUI();
     }
 
-    public void HideTutorialUI()
-    {
-        gameObject.SetActive(false);
-    }
-
     private void Start()
     {
         SetText(tutorialContent);
+
+        if (GameManager.Instance != null && !GameManager.Instance.IsGameStarted)
+        {
+            HideTutorialUI();
+        }
+        else
+        {
+            ShowTutorialUI();
+        }
+    }
+
+    public void ShowTutorialUI()
+    {
+        if (canvasGroup != null)
+        {
+            canvasGroup.alpha = 1f;
+            canvasGroup.blocksRaycasts = true;
+        }
+        else if (worldText != null)
+        {
+            Color c = worldText.color;
+            c.a = 1f;
+            worldText.color = c;
+            worldText.gameObject.SetActive(true);
+        }
+        else
+        {
+            gameObject.SetActive(true);
+        }
+    }
+
+    public void HideTutorialUI()
+    {
+        if (canvasGroup != null)
+        {
+            canvasGroup.alpha = 0f;
+            canvasGroup.blocksRaycasts = false;
+        }
+        else if (worldText != null)
+        {
+            Color c = worldText.color;
+            c.a = 0f;
+            worldText.color = c;
+        }
+        else
+        {
+            gameObject.SetActive(false);
+        }
     }
 
     public void SetText(string text)
@@ -69,7 +114,7 @@ public class ControlsTutorialUI : MonoBehaviour
 
     private void Update()
     {
-        if (GameManager.Instance != null && GameManager.Instance.IsGameOver)
+        if (GameManager.Instance != null && (!GameManager.Instance.IsGameStarted || GameManager.Instance.IsGameOver))
         {
             HideTutorialUI();
             return;

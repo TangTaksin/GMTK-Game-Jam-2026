@@ -111,18 +111,17 @@ public class ChasingThreat : MonoBehaviour
     private void OnEnable()
     {
         GameManager.OnGameOver += HandleGameOver;
+        GameManager.OnGameStart += HandleGameStart;
     }
 
     private void OnDisable()
     {
         GameManager.OnGameOver -= HandleGameOver;
+        GameManager.OnGameStart -= HandleGameStart;
     }
 
-    private void Start()
+    private void HandleGameStart()
     {
-        basePositionX = transform.position.x;
-        FindPlayer();
-
         if (enableJumpIntro)
         {
             TriggerJumpIntro();
@@ -130,6 +129,35 @@ public class ChasingThreat : MonoBehaviour
         else
         {
             SnapToGround();
+        }
+    }
+
+    private void Start()
+    {
+        basePositionX = transform.position.x;
+        FindPlayer();
+
+        if (GameManager.Instance != null && !GameManager.Instance.IsGameStarted)
+        {
+            if (enableJumpIntro)
+            {
+                isJumping = true;
+                currentJumpYOffset = startYOffset;
+                currentJumpXOffset = startXOffset;
+                currentJumpPitch = jumpPitchAngle;
+                SnapToGround();
+            }
+        }
+        else
+        {
+            if (enableJumpIntro)
+            {
+                TriggerJumpIntro();
+            }
+            else
+            {
+                SnapToGround();
+            }
         }
     }
 
