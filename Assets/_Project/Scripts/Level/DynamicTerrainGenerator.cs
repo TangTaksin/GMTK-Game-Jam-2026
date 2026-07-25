@@ -75,11 +75,14 @@ public class DynamicTerrainGenerator : MonoBehaviour
     [Tooltip("Enable Chasing Threat component on the left boundary wall.")]
     [SerializeField] private bool enableChasingThreat = true;
 
-    [Tooltip("X position of the left boundary wall.")]
+    [Tooltip("X position of the left boundary wall (front edge position).")]
     [SerializeField] private float leftWallX = -5f;
 
-    [Tooltip("Height of the left boundary wall.")]
-    [SerializeField] private float leftWallHeight = 30f;
+    [Tooltip("Width of the left boundary wall / threat.")]
+    [SerializeField] private float leftWallWidth = 67f;
+
+    [Tooltip("Height of the left boundary wall / threat.")]
+    [SerializeField] private float leftWallHeight = 27f;
 
     [Header("Chasing Threat Movement Settings")]
     [Tooltip("Base movement speed of chasing threat.")]
@@ -94,8 +97,11 @@ public class DynamicTerrainGenerator : MonoBehaviour
     [Tooltip("Delay in seconds after player first moves before threat activates.")]
     [SerializeField] private float threatStartGraceDelay = 1.0f;
 
-    [Header("Chasing Threat Visuals")]
-    [Tooltip("Sprite image for the chasing threat wall.")]
+    [Header("Chasing Threat Visuals & Prefab")]
+    [Tooltip("Optional custom Chasing Threat Prefab (e.g. pre-designed 67x27 wall with particles/animations). If assigned, this prefab will be instantiated instead of procedural creation.")]
+    [SerializeField] private GameObject threatPrefab;
+
+    [Tooltip("Sprite image for the chasing threat wall (used if threatPrefab is null).")]
     [SerializeField] private Sprite threatSprite;
 
     [Tooltip("Color tint for the chasing threat wall.")]
@@ -193,42 +199,65 @@ public class DynamicTerrainGenerator : MonoBehaviour
 
     private void CreateLeftBoundaryWall()
     {
-        GameObject wallObj = new GameObject("LeftBoundaryWall");
-        wallObj.transform.SetParent(transform, false);
-        leftWallTransform = wallObj.transform;
-        leftWallTransform.position = new Vector3(leftWallX, baseHeight + leftWallHeight / 2f, 0f);
+        GameObject wallObj;
+        ChasingThreat threatComponent = null;
 
-        float wallWidth = 2f;
-
-        BoxCollider2D wallCollider = wallObj.AddComponent<BoxCollider2D>();
-        wallCollider.size = new Vector2(wallWidth, leftWallHeight);
-        wallCollider.isTrigger = true;
-
-        // Add SpriteRenderer for visual appearance
-        SpriteRenderer sr = wallObj.AddComponent<SpriteRenderer>();
-        sr.color = threatColor;
-        sr.sortingLayerName = threatSortingLayer;
-        sr.sortingOrder = threatSortingOrder;
-
-        if (threatSprite != null)
+        if (threatPrefab != null)
         {
-            sr.sprite = threatSprite;
-            sr.drawMode = SpriteDrawMode.Sliced;
-            sr.size = new Vector2(wallWidth, leftWallHeight);
+            // Instantiate custom Prefab assigned in Inspector
+            wallObj = Instantiate(threatPrefab, transform);
+            wallObj.name = "LeftBoundaryWall";
+            leftWallTransform = wallObj.transform;
+
+            threatComponent = wallObj.GetComponent<ChasingThreat>();
+            if (threatComponent == null && enableChasingThreat)
+            {
+                threatComponent = wallObj.AddComponent<ChasingThreat>();
+            }
+
+            leftWallTransform.position = new Vector3(leftWallX, baseHeight + leftWallHeight / 2f, 0f);
         }
         else
         {
-            // Generate 1x1 fallback white texture sprite if no sprite assigned
-            Texture2D tex = new Texture2D(1, 1);
-            tex.SetPixel(0, 0, Color.white);
-            tex.Apply();
-            sr.sprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1f);
-            wallObj.transform.localScale = new Vector3(wallWidth, leftWallHeight, 1f);
+            // Fallback: Create procedural wall GameObject
+            wallObj = new GameObject("LeftBoundaryWall");
+            wallObj.transform.SetParent(transform, false);
+            leftWallTransform = wallObj.transform;
+
+            leftWallTransform.position = new Vector3(leftWallX, baseHeight + leftWallHeight / 2f, 0f);
+
+            BoxCollider2D wallCollider = wallObj.AddComponent<BoxCollider2D>();
+            wallCollider.size = new Vector2(leftWallWidth, leftWallHeight);
+            wallCollider.isTrigger = true;
+
+            SpriteRenderer sr = wallObj.AddComponent<SpriteRenderer>();
+            sr.color = threatColor;
+            sr.sortingLayerName = threatSortingLayer;
+            sr.sortingOrder = threatSortingOrder;
+
+            if (threatSprite != null)
+            {
+                sr.sprite = threatSprite;
+                sr.drawMode = SpriteDrawMode.Sliced;
+                sr.size = new Vector2(leftWallWidth, leftWallHeight);
+            }
+            else
+            {
+                Texture2D tex = new Texture2D(1, 1);
+                tex.SetPixel(0, 0, Color.white);
+                tex.Apply();
+                sr.sprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1f);
+                wallObj.transform.localScale = new Vector3(leftWallWidth, leftWallHeight, 1f);
+            }
+
+            if (enableChasingThreat)
+            {
+                threatComponent = wallObj.AddComponent<ChasingThreat>();
+            }
         }
 
-        if (enableChasingThreat)
+        if (enableChasingThreat && threatComponent != null)
         {
-            ChasingThreat threatComponent = wallObj.AddComponent<ChasingThreat>();
             threatComponent.Initialize(threatBaseSpeed, threatSpeedIncreasePerMeter, threatMaxDistanceBehind, threatStartGraceDelay);
         }
     }

@@ -44,7 +44,7 @@ EdgeCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 6200000, guid: 092fd2ff5ecc5e54cb4f25ed69e0c609, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -101,7 +101,7 @@ LineRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: a97c105638bdf8b4a8650670310a4cd3, type: 2}
+  - {fileID: 2100000, guid: 8dd470449ee2dc24a8f3d476d20d5004, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -145,8 +145,8 @@ LineRenderer:
       m_RotationOrder: 4
     colorGradient:
       serializedVersion: 2
-      key0: {r: 0.097818606, g: 0.32941177, b: 0.035294123, a: 1}
-      key1: {r: 0.2, g: 0.8, b: 0.2, a: 1}
+      key0: {r: 0.5921569, g: 0.9137255, b: 1, a: 1}
+      key1: {r: 0.5921569, g: 0.9812747, b: 1, a: 1}
       key2: {r: 0, g: 0, b: 0, a: 0}
       key3: {r: 0, g: 0, b: 0, a: 0}
       key4: {r: 0, g: 0, b: 0, a: 0}
@@ -197,25 +197,31 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DynamicTerrainGenerator
   player: {fileID: 0}
   generateAheadDistance: 20
-  removeBehindDistance: 15
-  xStep: 0.5
+  removeBehindDistance: 20
+  xStep: 0.1
   frequency: 0.05
   amplitude: 4
-  baseHeight: -3
+  baseHeight: -4
+  enableGroundFill: 1
+  fillDepth: 10
+  groundMaterial: {fileID: 2100000, guid: 315d05a963f27194ab663f4b67c5c03f, type: 2}
+  groundColor: {r: 1, g: 1, b: 1, a: 1}
+  groundSortingLayer: Default
+  groundSortingOrder: 0
   initialSafeZoneEnd: 15
   flatZoneLength: 8
   slopeZoneLength: 16
-  transitionLength: 2
+  transitionLength: 4
   startBehindOffset: 10
   createLeftWall: 1
   enableChasingThreat: 1
   leftWallX: -10
   leftWallHeight: 4
-  threatBaseSpeed: 2
-  threatSpeedIncreasePerMeter: 0.01
-  threatMaxDistanceBehind: 20
+  threatBaseSpeed: 2.5
+  threatSpeedIncreasePerMeter: 0.005
+  threatMaxDistanceBehind: 25
   threatStartGraceDelay: 2
   threatSprite: {fileID: 21300000, guid: ba31b6a4d88ef3142ab87d3ffadebeba, type: 3}
-  threatColor: {r: 1, g: 0.2, b: 0.2, a: 0.7}
+  threatColor: {r: 1, g: 1, b: 1, a: 1}
   threatSortingLayer: Default
   threatSortingOrder: 10
