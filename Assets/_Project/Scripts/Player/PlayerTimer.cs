@@ -101,6 +101,7 @@ public class PlayerTimer : MonoBehaviour
     {
         isExploded = true;
         Debug.Log("<color=red>BOOM! Player Exploded!</color>");
+        if (CameraFollow.Instance != null) CameraFollow.Instance.ShakeCamera(0.4f, 0.7f);
         gameObject.SetActive(false);
 
         if (GameManager.Instance != null)

@@ -1,4 +1,5 @@
 using UnityEngine;
+using DG.Tweening;
 
 [RequireComponent(typeof(Collider2D))]
 public class ChasingThreat : MonoBehaviour
@@ -42,9 +43,10 @@ public class ChasingThreat : MonoBehaviour
     private BoxCollider2D boxCollider;
     private SpriteRenderer spriteRenderer;
     private bool isThreatActive;
-    private float graceTimer;
     private Rigidbody2D playerRb;
     private Vector3 initialScale = Vector3.one;
+    private Tween squashTween;
+    private Tween graceTween;
 
     public void Initialize(float speed, float speedIncrease, float maxDistance, float graceDelay)
     {
@@ -82,17 +84,35 @@ public class ChasingThreat : MonoBehaviour
         SnapToGround();
     }
 
-    private void Update()
+    private void OnDestroy()
     {
-        if (!enableSquashAndStretch || !isThreatActive) return;
+        squashTween?.Kill();
+        graceTween?.Kill();
+    }
 
-        // Normal movement pulse (Squash & Stretch)
-        float pulse = Mathf.Sin(Time.time * pulseSpeed) * pulseAmount;
-        transform.localScale = new Vector3(
-            initialScale.x * (1f + pulse),
-            initialScale.y * (1f - pulse * 0.5f),
+    private void ActivateThreat()
+    {
+        if (isThreatActive) return;
+        isThreatActive = true;
+        StartPulseAnimation();
+    }
+
+    private void StartPulseAnimation()
+    {
+        if (!enableSquashAndStretch || squashTween != null) return;
+
+        Vector3 targetScale = new Vector3(
+            initialScale.x * (1f + pulseAmount),
+            initialScale.y * (1f - pulseAmount * 0.5f),
             initialScale.z
         );
+
+        float halfPeriod = pulseSpeed > 0f ? (Mathf.PI / pulseSpeed) : 0.25f;
+
+        squashTween = transform.DOScale(targetScale, halfPeriod)
+            .SetEase(Ease.InOutSine)
+            .SetLoops(-1, LoopType.Yoyo)
+            .SetLink(gameObject);
     }
 
     private void SnapToGround()
@@ -180,10 +200,16 @@ public class ChasingThreat : MonoBehaviour
 
             if (hasPlayerInput || isPlayerMoving)
             {
-                graceTimer += Time.fixedDeltaTime;
-                if (graceTimer >= startGraceDelay)
+                if (graceTween == null)
                 {
-                    isThreatActive = true;
+                    if (startGraceDelay <= 0f)
+                    {
+                        ActivateThreat();
+                    }
+                    else
+                    {
+                        graceTween = DOVirtual.DelayedCall(startGraceDelay, ActivateThreat).SetLink(gameObject);
+                    }
                 }
             }
             return;
@@ -250,6 +276,7 @@ public class ChasingThreat : MonoBehaviour
             }
             else
             {
+                if (CameraFollow.Instance != null) CameraFollow.Instance.ShakeCamera(0.4f, 0.7f);
                 GameManager.Instance.TriggerGameOver();
             }
         }

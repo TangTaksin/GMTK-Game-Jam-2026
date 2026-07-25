@@ -1,4 +1,5 @@
 using UnityEngine;
+using DG.Tweening;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class PlayerMovement : MonoBehaviour
@@ -37,6 +38,12 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float negativeVelStopDuration = 0.5f; // Duration before auto-stopping backward movement (0.5s default)
     [SerializeField] private float negativeVelBrakeForce = 30f; // Smooth rapid brake force when stopping negative velocity
 
+    [Header("Juice / Visual Feedback")]
+    [SerializeField] private bool enableJuice = true;
+    [SerializeField] private Vector3 jumpPunchScale = new Vector3(-0.15f, 0.25f, 0f);
+    [SerializeField] private Vector3 landPunchScale = new Vector3(0.25f, -0.2f, 0f);
+    [SerializeField] private float juiceDuration = 0.2f;
+
     private Rigidbody2D rb;
     private bool jumpRequested;
     private int jumpsRemaining;
@@ -48,6 +55,7 @@ public class PlayerMovement : MonoBehaviour
     private float justJumpedTimer = 0f;
     private bool wasGroundedOnSlope = false;
     private Vector2 lastSlopeTangent = Vector2.right;
+    private Vector3 initialScale = Vector3.one;
 
     public bool IsGrounded => isGrounded;
     public Vector2 GroundNormal => groundNormal;
@@ -56,6 +64,20 @@ public class PlayerMovement : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         rb.interpolation = RigidbodyInterpolation2D.Interpolate;
+        initialScale = transform.localScale;
+    }
+
+    private void OnDestroy()
+    {
+        transform.DOKill();
+    }
+
+    private void TriggerJuice(Vector3 punchAmount)
+    {
+        if (!enableJuice) return;
+        transform.DOKill();
+        transform.localScale = initialScale;
+        transform.DOPunchScale(punchAmount, juiceDuration, 6, 0.5f);
     }
 
     private void Update()
@@ -109,6 +131,11 @@ public class PlayerMovement : MonoBehaviour
                 groundNormal = hitRight.normal;
             }
 
+            if (!isGrounded)
+            {
+                TriggerJuice(landPunchScale);
+            }
+
             isGrounded = true;
             coyoteTimer = coyoteTime;
             jumpsRemaining = maxJumps;
@@ -144,6 +171,9 @@ public class PlayerMovement : MonoBehaviour
             jumpBufferTimer = 0f;
             coyoteTimer = 0f;
             justJumpedTimer = 0.15f;
+
+            // Trigger Jump Stretch Visual Feedback
+            TriggerJuice(jumpPunchScale);
 
             // Launch direction blends Upward force with current slope normal
             Vector2 jumpDir = (Vector2.up * 0.8f + groundNormal * 0.2f).normalized;

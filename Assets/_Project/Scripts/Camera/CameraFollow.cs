@@ -1,7 +1,10 @@
 using UnityEngine;
+using DG.Tweening;
 
 public class CameraFollow : MonoBehaviour
 {
+    public static CameraFollow Instance { get; private set; }
+
     [Header("Target Settings")]
     [SerializeField] private Transform target;
     [SerializeField] private Vector3 baseOffset = new Vector3(0f, 1.5f, -10f);
@@ -39,6 +42,8 @@ public class CameraFollow : MonoBehaviour
 
     private void Awake()
     {
+        if (Instance == null) Instance = this;
+
         cam = GetComponent<Camera>();
         if (cam == null) cam = Camera.main;
 
@@ -46,6 +51,12 @@ public class CameraFollow : MonoBehaviour
         {
             InitTargetComponents();
         }
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+        transform.DOKill();
     }
 
     private void InitTargetComponents()
@@ -61,6 +72,12 @@ public class CameraFollow : MonoBehaviour
     {
         target = newTarget;
         InitTargetComponents();
+    }
+
+    public void ShakeCamera(float duration = 0.35f, float strength = 0.6f)
+    {
+        transform.DOKill();
+        transform.DOShakePosition(duration, strength, 14, 90f, false, true).SetUpdate(true);
     }
 
     private void LateUpdate()
@@ -136,4 +153,3 @@ public class CameraFollow : MonoBehaviour
         }
     }
 }
-

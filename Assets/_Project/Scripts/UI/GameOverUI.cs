@@ -1,11 +1,16 @@
 using UnityEngine;
 using TMPro;
+using DG.Tweening;
 
 public class GameOverUI : MonoBehaviour
 {
     [Header("UI References")]
     [SerializeField] private GameObject container;
     [SerializeField] private TextMeshProUGUI gameOverText;
+
+    [Header("Animation Settings")]
+    [SerializeField] private float animDuration = 0.4f;
+    [SerializeField] private Ease easeType = Ease.OutBack;
 
     private void Awake()
     {
@@ -24,6 +29,14 @@ public class GameOverUI : MonoBehaviour
     private void OnDisable()
     {
         GameManager.OnGameOver -= ShowGameOverUI;
+    }
+
+    private void OnDestroy()
+    {
+        if (container != null)
+        {
+            container.transform.DOKill();
+        }
     }
 
     private void ShowGameOverUI()
@@ -48,8 +61,14 @@ public class GameOverUI : MonoBehaviour
 
         if (container != null)
         {
+            container.transform.DOKill();
+            container.transform.localScale = Vector3.zero;
             container.SetActive(true);
+
+            container.transform.DOScale(Vector3.one, animDuration)
+                .SetEase(easeType)
+                .SetUpdate(true)
+                .SetLink(container);
         }
     }
 }
-
