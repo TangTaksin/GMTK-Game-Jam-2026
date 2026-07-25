@@ -2,5 +2,6 @@
   <Project Path="Assembly-CSharp.csproj" />
   <Project Path="MasyoLab-FavoritesAsset.csproj" />
   <Project Path="FullscreenEditor.csproj" />
+  <Project Path="Assembly-CSharp-firstpass.csproj" />
   <Project Path="MasyoLab-FavoritesAssetExamples.csproj" />
 </Solution>
