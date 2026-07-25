@@ -196,7 +196,7 @@ MonoBehaviour:
   pulseSpeed: 6
   pulseAmount: 0.05
   enableJumpIntro: 1
-  jumpIntroDelay: 3.5
+  jumpIntroDelay: 5
   jumpHeight: 2.5
   startYOffset: -5
   startXOffset: -3

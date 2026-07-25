@@ -53,11 +53,11 @@ Material:
     - _SparkleSpeed: 0.1
     - _ZWrite: 0
     m_Colors:
-    - _BottomColor: {r: 0.92941177, g: 0.9490196, b: 0.972549, a: 1}
+    - _BottomColor: {r: 0.909804, g: 0.9450981, b: 0.95294124, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _RendererColor: {r: 1, g: 1, b: 1, a: 1}
-    - _RimColor: {r: 0.4862745, g: 0.6039216, b: 0.7607843, a: 1}
+    - _RimColor: {r: 0.6, g: 0.9215687, b: 0.9921569, a: 1}
     - _SparkleColor: {r: 1, g: 1, b: 1, a: 1}
-    - _TopColor: {r: 0.6627451, g: 0.7411765, b: 0.84705883, a: 1}
+    - _TopColor: {r: 0.6, g: 0.9215687, b: 0.9960785, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
