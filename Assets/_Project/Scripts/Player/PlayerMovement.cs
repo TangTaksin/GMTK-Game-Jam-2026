@@ -133,10 +133,33 @@ public class PlayerMovement : MonoBehaviour
     {
         GameManager.OnGameStart -= HandleGameStart;
         GameManager.OnGameOver -= HandleGameOver;
+        CameraFollow.OnCameraPanComplete -= OnCameraPanCompleteForIntro;
     }
 
     private void HandleGameStart()
     {
+        if (enableJumpIntro)
+        {
+            if (CameraFollow.Instance != null)
+            {
+                CameraFollow.Instance.StartPanDownIfNeeded();
+            }
+
+            if (CameraFollow.Instance != null && CameraFollow.Instance.IsPanningDown)
+            {
+                CameraFollow.OnCameraPanComplete -= OnCameraPanCompleteForIntro;
+                CameraFollow.OnCameraPanComplete += OnCameraPanCompleteForIntro;
+            }
+            else
+            {
+                TriggerJumpIntro();
+            }
+        }
+    }
+
+    private void OnCameraPanCompleteForIntro()
+    {
+        CameraFollow.OnCameraPanComplete -= OnCameraPanCompleteForIntro;
         if (enableJumpIntro)
         {
             TriggerJumpIntro();

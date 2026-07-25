@@ -127,10 +127,37 @@ public class ChasingThreat : MonoBehaviour
     {
         GameManager.OnGameOver -= HandleGameOver;
         GameManager.OnGameStart -= HandleGameStart;
+        CameraFollow.OnCameraPanComplete -= OnCameraPanCompleteForIntro;
     }
 
     private void HandleGameStart()
     {
+        if (enableJumpIntro)
+        {
+            if (CameraFollow.Instance != null)
+            {
+                CameraFollow.Instance.StartPanDownIfNeeded();
+            }
+
+            if (CameraFollow.Instance != null && CameraFollow.Instance.IsPanningDown)
+            {
+                CameraFollow.OnCameraPanComplete -= OnCameraPanCompleteForIntro;
+                CameraFollow.OnCameraPanComplete += OnCameraPanCompleteForIntro;
+            }
+            else
+            {
+                TriggerJumpIntro();
+            }
+        }
+        else
+        {
+            SnapToGround();
+        }
+    }
+
+    private void OnCameraPanCompleteForIntro()
+    {
+        CameraFollow.OnCameraPanComplete -= OnCameraPanCompleteForIntro;
         if (enableJumpIntro)
         {
             TriggerJumpIntro();

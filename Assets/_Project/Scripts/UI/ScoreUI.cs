@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using DG.Tweening;
 
 namespace UI
 {
@@ -11,7 +12,11 @@ namespace UI
         [Header("Display Format")]
         [SerializeField] private string format = "<b>{0}m</b>  <size=85%><color=#FFCC00>SCORE: {1}</color>  <color=#888888>BEST: {2}</color></size>";
 
+        [Header("Fade Settings")]
+        [SerializeField] private float fadeInDuration = 0.35f;
+
         private CanvasGroup canvasGroup;
+        private Tween fadeTween;
 
         private void Awake()
         {
@@ -22,22 +27,25 @@ namespace UI
         private void OnEnable()
         {
             ScoreManager.OnScoreUpdated += UpdateScoreText;
-            GameManager.OnGameStart += ShowScoreText;
+            GameManager.OnGameStart += HandleGameStart;
             GameManager.OnGameOver += HideScoreText;
+            CameraFollow.OnCameraPanComplete += HandleCameraPanComplete;
         }
 
         private void OnDisable()
         {
             ScoreManager.OnScoreUpdated -= UpdateScoreText;
-            GameManager.OnGameStart -= ShowScoreText;
+            GameManager.OnGameStart -= HandleGameStart;
             GameManager.OnGameOver -= HideScoreText;
+            CameraFollow.OnCameraPanComplete -= HandleCameraPanComplete;
+            fadeTween?.Kill();
         }
 
         private void Start()
         {
             if (GameManager.Instance != null && !GameManager.Instance.IsGameStarted)
             {
-                HideScoreText();
+                HideScoreTextInstant();
             }
             else
             {
@@ -53,12 +61,42 @@ namespace UI
             }
         }
 
+        private void HandleGameStart()
+        {
+            // If camera is panning down, keep ScoreUI hidden until pan completes
+            if (CameraFollow.Instance != null && CameraFollow.Instance.IsPanningDown)
+            {
+                HideScoreTextInstant();
+            }
+            else
+            {
+                ShowScoreText();
+            }
+        }
+
+        private void HandleCameraPanComplete()
+        {
+            if (GameManager.Instance != null && GameManager.Instance.IsGameStarted && !GameManager.Instance.IsGameOver)
+            {
+                ShowScoreText();
+            }
+        }
+
         private void ShowScoreText()
         {
+            fadeTween?.Kill();
+
             if (canvasGroup != null)
             {
-                canvasGroup.alpha = 1f;
                 canvasGroup.blocksRaycasts = true;
+                if (fadeInDuration > 0f)
+                {
+                    fadeTween = canvasGroup.DOFade(1f, fadeInDuration).SetUpdate(true);
+                }
+                else
+                {
+                    canvasGroup.alpha = 1f;
+                }
             }
             else if (scoreText != null)
             {
@@ -70,12 +108,38 @@ namespace UI
             }
         }
 
-        private void HideScoreText()
+        private void HideScoreTextInstant()
         {
+            fadeTween?.Kill();
+
             if (canvasGroup != null)
             {
                 canvasGroup.alpha = 0f;
                 canvasGroup.blocksRaycasts = false;
+            }
+            else if (scoreText != null)
+            {
+                scoreText.gameObject.SetActive(false);
+            }
+        }
+
+        private void HideScoreText()
+        {
+            fadeTween?.Kill();
+
+            if (canvasGroup != null)
+            {
+                if (fadeInDuration > 0f)
+                {
+                    fadeTween = canvasGroup.DOFade(0f, fadeInDuration)
+                        .SetUpdate(true)
+                        .OnComplete(() => canvasGroup.blocksRaycasts = false);
+                }
+                else
+                {
+                    canvasGroup.alpha = 0f;
+                    canvasGroup.blocksRaycasts = false;
+                }
             }
             else if (scoreText != null)
             {

@@ -5,9 +5,35 @@ public class CameraFollow : MonoBehaviour
 {
     public static CameraFollow Instance { get; private set; }
 
+    private enum CameraState
+    {
+        MenuFixed,     // Locked at Y = startCameraY (3.0)
+        PanningDown,   // Smoothly animating Y from 3.0 down to targetPanY (0.0)
+        GameplayFollow // Standard gameplay camera follow
+    }
+
     [Header("Target Settings")]
     [SerializeField] private Transform target;
     [SerializeField] private Vector3 baseOffset = new Vector3(0f, 1.5f, -10f);
+
+    [Header("Start Menu Camera Pan")]
+    [Tooltip("Target camera position X before pressing Start (Main Menu state).")]
+    [SerializeField] private float startCameraX = 0.0f;
+
+    [Tooltip("Target camera position Y before pressing Start (Main Menu state).")]
+    [SerializeField] private float startCameraY = 3.0f;
+
+    [Tooltip("Target camera position X to pan down to before player jump intro plays.")]
+    [SerializeField] private float targetPanX = 0.0f;
+
+    [Tooltip("Target camera position Y to pan down to before player jump intro plays.")]
+    [SerializeField] private float targetPanY = 0.0f;
+
+    [Tooltip("Duration in seconds to smoothly pan camera down when game starts.")]
+    [SerializeField] private float panDownDuration = 1.2f;
+
+    [Tooltip("Easing curve for panning camera down.")]
+    [SerializeField] private Ease panEase = Ease.InOutCubic;
 
     [Header("Smooth Damping")]
     [SerializeField] private float smoothTimeX = 0.15f;
@@ -33,7 +59,7 @@ public class CameraFollow : MonoBehaviour
 
     [Header("Intro Camera Settings")]
     [Tooltip("If true, camera stays fixed at spawn position until player intro jump finishes.")]
-    [SerializeField] private bool lockDuringIntro = true;
+    [SerializeField] private bool lockDuringIntro = false;
 
     private Rigidbody2D targetRb;
     private PlayerMovement targetMovement;
@@ -43,6 +69,14 @@ public class CameraFollow : MonoBehaviour
     private float velocityY;
     private float currentLookAheadX;
     private float currentVerticalOffset;
+
+    private CameraState currentState = CameraState.MenuFixed;
+    private float currentPanX = 0.0f;
+    private float currentPanY = 3.0f;
+    private Tween panTween;
+
+    public static event System.Action OnCameraPanComplete;
+    public bool IsPanningDown => currentState == CameraState.PanningDown;
 
     private void Awake()
     {
@@ -57,22 +91,92 @@ public class CameraFollow : MonoBehaviour
         }
     }
 
+    private void OnEnable()
+    {
+        GameManager.OnGameStart += HandleGameStart;
+        GameManager.OnGameRestart += HandleGameRestart;
+    }
+
+    private void OnDisable()
+    {
+        GameManager.OnGameStart -= HandleGameStart;
+        GameManager.OnGameRestart -= HandleGameRestart;
+    }
+
     private void Start()
+    {
+        SetupInitialPosition();
+    }
+
+    private void SetupInitialPosition()
     {
         if (target != null)
         {
-            Vector3 startPos = target.position + baseOffset;
-            if (DynamicTerrainGenerator.Instance != null)
+            // If game is not started yet (Start Menu active), lock initial position to (startCameraX=0, startCameraY=3)
+            if (GameManager.Instance != null && !GameManager.Instance.IsGameStarted)
             {
-                startPos.y = DynamicTerrainGenerator.Instance.CalculateHeightAt(target.position.x) + baseOffset.y;
+                currentState = CameraState.MenuFixed;
+                currentPanX = startCameraX;
+                currentPanY = startCameraY;
+                transform.position = new Vector3(startCameraX, startCameraY, baseOffset.z);
             }
-            transform.position = startPos;
+            else
+            {
+                currentState = CameraState.GameplayFollow;
+                Vector3 startPos = target.position + baseOffset;
+                if (DynamicTerrainGenerator.Instance != null)
+                {
+                    startPos.y = DynamicTerrainGenerator.Instance.CalculateHeightAt(target.position.x) + baseOffset.y;
+                }
+                transform.position = startPos;
+            }
         }
+    }
+
+    /// <summary>
+    /// Starts panning the camera down from (0, 3.0) to (0, 0.0) if needed.
+    /// Safely idempotent to support deterministic event triggering order.
+    /// </summary>
+    public void StartPanDownIfNeeded()
+    {
+        if (currentState == CameraState.PanningDown || currentState == CameraState.GameplayFollow)
+        {
+            return;
+        }
+
+        currentState = CameraState.PanningDown;
+        currentPanX = startCameraX;
+        currentPanY = startCameraY;
+
+        panTween?.Kill();
+        Sequence panSeq = DOTween.Sequence().SetLink(gameObject);
+        panSeq.Join(DOTween.To(() => currentPanX, x => currentPanX = x, targetPanX, panDownDuration).SetEase(panEase));
+        panSeq.Join(DOTween.To(() => currentPanY, y => currentPanY = y, targetPanY, panDownDuration).SetEase(panEase));
+        panSeq.OnComplete(() =>
+        {
+            currentState = CameraState.GameplayFollow;
+            OnCameraPanComplete?.Invoke();
+        });
+        panTween = panSeq;
+    }
+
+    private void HandleGameStart()
+    {
+        StartPanDownIfNeeded();
+    }
+
+    private void HandleGameRestart()
+    {
+        panTween?.Kill();
+        currentState = CameraState.MenuFixed;
+        currentPanX = startCameraX;
+        currentPanY = startCameraY;
     }
 
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        panTween?.Kill();
         transform.DOKill();
     }
 
@@ -106,7 +210,21 @@ public class CameraFollow : MonoBehaviour
             InitTargetComponents();
         }
 
-        // Lock camera position during player intro jump
+        // State 1: Menu Fixed (Locked at X = startCameraX 0.0, Y = startCameraY 3.0)
+        if (currentState == CameraState.MenuFixed)
+        {
+            transform.position = new Vector3(startCameraX, startCameraY, baseOffset.z);
+            return;
+        }
+
+        // State 2: Panning Down (Smoothly animating X from startCameraX to targetPanX, Y from startCameraY to targetPanY 0.0)
+        if (currentState == CameraState.PanningDown)
+        {
+            transform.position = new Vector3(currentPanX, currentPanY, baseOffset.z);
+            return;
+        }
+
+        // State 3: Gameplay Follow
         if (lockDuringIntro && targetMovement != null && targetMovement.IsIntroJumping)
         {
             return;
