@@ -12,6 +12,12 @@ Shader "Custom/IceGroundShader"
         _ColorBands ("Color Bands (Posterization)", Range(2, 16)) = 5
         _IceNoiseScale ("Pixel Pattern Scale", Range(1.0, 50.0)) = 10.0
         _IceNoiseStrength ("Pixel Dither Intensity", Range(0.0, 1.0)) = 0.25
+
+        [Header(Sparkle Animation Settings)]
+        _SparkleColor ("Sparkle Color", Color) = (1.0, 1.0, 1.0, 1.0)
+        _SparkleSpeed ("Sparkle Speed", Range(0.1, 10.0)) = 2.5
+        _SparkleDensity ("Sparkle Density", Range(0.001, 0.2)) = 0.03
+        _SparkleIntensity ("Sparkle Intensity", Range(0.0, 5.0)) = 1.5
     }
 
     SubShader
@@ -59,6 +65,10 @@ Shader "Custom/IceGroundShader"
                 float _ColorBands;
                 float _IceNoiseScale;
                 float _IceNoiseStrength;
+                float4 _SparkleColor;
+                float _SparkleSpeed;
+                float _SparkleDensity;
+                float _SparkleIntensity;
             CBUFFER_END
 
             // Pseudo-random pixel dithering generator
@@ -101,6 +111,16 @@ Shader "Custom/IceGroundShader"
                 float rimMask = step(1.0 - _RimThickness, pixelUVY);
                 float4 finalColor = lerp(baseColor, _RimColor, rimMask);
 
+                // 5. Animated Pixel Sparkle / Glint
+                float2 gridPos = floor(input.worldPos.xy * PPU);
+                float randSeed = PixelHash(gridPos + float2(17.1, 43.3));
+                float canSparkle = step(1.0 - _SparkleDensity, randSeed);
+                float phase = PixelHash(gridPos + float2(73.7, 19.9)) * 6.28318;
+                float cycle = sin(_Time.y * _SparkleSpeed + phase) * 0.5 + 0.5;
+                float glint = pow(cycle, 12.0) * canSparkle * _SparkleIntensity;
+
+                finalColor.rgb += _SparkleColor.rgb * glint;
+
                 return finalColor;
             }
             ENDHLSL
@@ -141,6 +161,16 @@ Shader "Custom/IceGroundShader"
             float _ColorBands;
             float _IceNoiseScale;
             float _IceNoiseStrength;
+            fixed4 _SparkleColor;
+            float _SparkleSpeed;
+            float _SparkleDensity;
+            float _SparkleIntensity;
+
+            float PixelHash(float2 p)
+            {
+                p = floor(p);
+                return frac(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453);
+            }
 
             v2f vert (appdata v)
             {
@@ -158,8 +188,28 @@ Shader "Custom/IceGroundShader"
                 float rawDepth = saturate(1.0 - i.uv.y);
                 float depthFactor = floor(rawDepth * _ColorBands) / max(1.0, _ColorBands - 1.0);
                 fixed4 baseColor = lerp(_TopColor, _BottomColor, depthFactor);
-                float rimMask = step(1.0 - _RimThickness, i.uv.y);
-                return lerp(baseColor, _RimColor, rimMask);
+
+                float2 noiseCoord = pixelPos * _IceNoiseScale;
+                float dither = PixelHash(noiseCoord);
+                if (dither > 0.72)
+                {
+                    baseColor.rgb += _IceNoiseStrength * float3(0.35, 0.65, 0.95);
+                }
+
+                float pixelUVY = floor(i.uv.y * (PPU * 0.5)) / (PPU * 0.5);
+                float rimMask = step(1.0 - _RimThickness, pixelUVY);
+                fixed4 finalColor = lerp(baseColor, _RimColor, rimMask);
+
+                float2 gridPos = floor(i.worldPos.xy * PPU);
+                float randSeed = PixelHash(gridPos + float2(17.1, 43.3));
+                float canSparkle = step(1.0 - _SparkleDensity, randSeed);
+                float phase = PixelHash(gridPos + float2(73.7, 19.9)) * 6.28318;
+                float cycle = sin(_Time.y * _SparkleSpeed + phase) * 0.5 + 0.5;
+                float glint = pow(cycle, 12.0) * canSparkle * _SparkleIntensity;
+
+                finalColor.rgb += _SparkleColor.rgb * glint;
+
+                return finalColor;
             }
             ENDCG
         }

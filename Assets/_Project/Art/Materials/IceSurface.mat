@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: MyIceMaterial
+  m_Name: IceSurface
   m_Shader: {fileID: 4800000, guid: 83525bee00107944a81448d77caa679e, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -43,21 +43,21 @@ Material:
     m_Floats:
     - _ColorBands: 16
     - _EnableExternalAlpha: 0
-    - _IceNoiseScale: 16
-    - _IceNoiseStrength: 0.02
+    - _IceNoiseScale: 1
+    - _IceNoiseStrength: 0
     - _PixelsPerUnit: 32
     - _RimThickness: 0
     - _ShimmerSpeed: 2.68
-    - _SparkleDensity: 0.06
-    - _SparkleIntensity: 0.13
-    - _SparkleSpeed: 1
+    - _SparkleDensity: 0.019
+    - _SparkleIntensity: 3.15
+    - _SparkleSpeed: 0.1
     - _ZWrite: 0
     m_Colors:
-    - _BottomColor: {r: 0.17254904, g: 0.2810672, b: 0.49411765, a: 1}
+    - _BottomColor: {r: 0.909804, g: 0.9450981, b: 0.95294124, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _RendererColor: {r: 1, g: 1, b: 1, a: 1}
-    - _RimColor: {r: 0.8584906, g: 0.9917962, b: 1, a: 1}
+    - _RimColor: {r: 0.6, g: 0.9215687, b: 0.9921569, a: 1}
     - _SparkleColor: {r: 1, g: 1, b: 1, a: 1}
-    - _TopColor: {r: 0.6, g: 0.92, b: 1, a: 1}
+    - _TopColor: {r: 0.6, g: 0.9215687, b: 0.9960785, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
