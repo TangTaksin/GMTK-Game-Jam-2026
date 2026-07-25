@@ -100,11 +100,13 @@ public class PlayerMovement : MonoBehaviour
     private void OnEnable()
     {
         GameManager.OnGameStart += HandleGameStart;
+        GameManager.OnGameOver += HandleGameOver;
     }
 
     private void OnDisable()
     {
         GameManager.OnGameStart -= HandleGameStart;
+        GameManager.OnGameOver -= HandleGameOver;
     }
 
     private void HandleGameStart()
@@ -113,6 +115,24 @@ public class PlayerMovement : MonoBehaviour
         {
             TriggerJumpIntro();
         }
+    }
+
+    private void HandleGameOver()
+    {
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
+
+        // Hide sprite renderers on Player and child objects (e.g. Visuals)
+        SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>();
+        foreach (var sr in renderers)
+        {
+            sr.enabled = false;
+        }
+
+        enabled = false;
     }
 
     private void Start()
@@ -256,6 +276,7 @@ public class PlayerMovement : MonoBehaviour
     private void Update()
     {
         if (isIntroJumping) return;
+        if (GameManager.Instance != null && GameManager.Instance.IsGameOver) return;
 
         if (Input.GetButtonDown("Jump"))
         {
@@ -338,6 +359,12 @@ public class PlayerMovement : MonoBehaviour
         if (isIntroJumping)
         {
             UpdateIntroPosition();
+            return;
+        }
+
+        if (GameManager.Instance != null && GameManager.Instance.IsGameOver)
+        {
+            rb.linearVelocity = Vector2.zero;
             return;
         }
 

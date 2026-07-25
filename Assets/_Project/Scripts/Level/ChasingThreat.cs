@@ -106,6 +106,11 @@ public class ChasingThreat : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         initialScale = transform.localScale;
         basePositionX = transform.position.x;
+
+        if (rb != null)
+        {
+            rb.bodyType = RigidbodyType2D.Kinematic;
+        }
     }
 
     private void OnEnable()
@@ -145,6 +150,14 @@ public class ChasingThreat : MonoBehaviour
                 currentJumpYOffset = startYOffset;
                 currentJumpXOffset = startXOffset;
                 currentJumpPitch = jumpPitchAngle;
+
+                if (rb != null)
+                {
+                    rb.bodyType = RigidbodyType2D.Kinematic;
+                    rb.linearVelocity = Vector2.zero;
+                    rb.angularVelocity = 0f;
+                }
+
                 SnapToGround();
             }
         }
@@ -223,11 +236,20 @@ public class ChasingThreat : MonoBehaviour
         if (!enableJumpIntro) return;
 
         jumpSequence?.Kill();
+        graceTween?.Kill();
+        isThreatActive = false;
 
         isJumping = true;
         currentJumpYOffset = startYOffset;
         currentJumpXOffset = startXOffset;
         currentJumpPitch = jumpPitchAngle;
+
+        if (rb != null)
+        {
+            rb.bodyType = RigidbodyType2D.Kinematic;
+            rb.linearVelocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
 
         SnapToGround();
 
@@ -271,10 +293,18 @@ public class ChasingThreat : MonoBehaviour
 
     private void OnJumpLand()
     {
+        if (rb != null)
+        {
+            rb.bodyType = RigidbodyType2D.Kinematic;
+            rb.linearVelocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
         if (CameraFollow.Instance != null)
         {
             CameraFollow.Instance.ShakeCamera(0.2f, 0.35f);
         }
+
+        ActivateThreat();
 
         if (enableSquashAndStretch)
         {
@@ -293,9 +323,10 @@ public class ChasingThreat : MonoBehaviour
 
     private void ActivateThreat()
     {
-        if (isThreatActive) return;
+        if (isThreatActive || isJumping) return;
+        if (GameManager.Instance != null && !GameManager.Instance.IsGameStarted) return;
         isThreatActive = true;
-        if (!isJumping) StartPulseAnimation();
+        StartPulseAnimation();
     }
 
     private void StartPulseAnimation()
@@ -354,7 +385,7 @@ public class ChasingThreat : MonoBehaviour
         float targetY = followTerrainCurve ? CalculateTargetY(targetX) : transform.position.y;
         Vector2 nextPos = new Vector2(targetX, targetY + extraYOffset);
 
-        if (rb != null && rb.bodyType != RigidbodyType2D.Kinematic)
+        if (rb != null)
         {
             rb.MovePosition(nextPos);
         }
@@ -433,6 +464,11 @@ public class ChasingThreat : MonoBehaviour
         if (!isThreatActive)
         {
             SnapToGround();
+
+            if (isJumping || (GameManager.Instance != null && !GameManager.Instance.IsGameStarted))
+            {
+                return;
+            }
 
             if (playerTransform == null) FindPlayer();
             if (playerTransform == null) return;
