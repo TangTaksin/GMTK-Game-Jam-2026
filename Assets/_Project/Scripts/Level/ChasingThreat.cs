@@ -10,26 +10,20 @@ public class ChasingThreat : MonoBehaviour
     [SerializeField] private float maxDistanceBehind = 14f;
     [SerializeField] private float speedIncreasePerMeter = 0.01f;
 
-    [Header("Collision Settings")]
+    [Header("Collision & Activation Settings")]
     [SerializeField] private string playerTag = "Player";
+    [Tooltip("Seconds after first player input before threat starts moving.")]
+    [SerializeField] private float startGraceDelay = 1.0f;
 
-    [Header("Activation Settings")]
-    [SerializeField] private float startGraceDelay = 1.0f; // Seconds after first player input before threat moves
-
-    [Header("Terrain Curve Settings")]
+    [Header("Terrain & Slope Settings")]
     [SerializeField] private bool followTerrainCurve = true;
     [SerializeField] private float yOffsetFromGround = 0f;
-
-    [Header("Auto Slope & Rotation Settings")]
     [Tooltip("Enable automatic slope rotation to tilt threat along terrain curves.")]
     [SerializeField] private bool autoSlopeRotation = true;
-
     [Tooltip("Rotation smoothing speed (higher = faster response).")]
     [SerializeField] private float rotationSpeed = 10f;
-
     [Tooltip("Maximum allowed tilt angle in degrees.")]
     [SerializeField] private float maxTiltAngle = 60f;
-
     [Tooltip("Distance delta to sample terrain slope.")]
     [SerializeField] private float slopeSampleDistance = 0.5f;
 
@@ -39,14 +33,62 @@ public class ChasingThreat : MonoBehaviour
     [SerializeField] private float pulseSpeed = 6.0f;
     [SerializeField] private float pulseAmount = 0.05f;
 
+    [Header("Jump Intro Settings")]
+    [Tooltip("Enable jump intro animation when threat appears.")]
+    [SerializeField] private bool enableJumpIntro = true;
+    [Tooltip("Delay in seconds before starting the jump intro animation.")]
+    [SerializeField] private float jumpIntroDelay = 0.3f;
+    [Tooltip("Peak jump height above ground surface.")]
+    [SerializeField] private float jumpHeight = 3.5f;
+    [Tooltip("Initial Y offset below ground surface before jump.")]
+    [SerializeField] private float startYOffset = -5.0f;
+    [Tooltip("Initial X offset relative to starting position.")]
+    [SerializeField] private float startXOffset = -4.0f;
+    [Tooltip("Landing X offset relative to starting position (0 = land on spawn position).")]
+    [SerializeField] private float landingXOffset = 0.0f;
+    [Tooltip("Total duration of jump animation in seconds.")]
+    [SerializeField] private float jumpDuration = 0.85f;
+    [Tooltip("Rotation pitch effect during jump (degrees).")]
+    [SerializeField] private float jumpPitchAngle = 20f;
+    [SerializeField] private Ease jumpUpEase = Ease.OutQuad;
+    [SerializeField] private Ease jumpDownEase = Ease.InQuad;
+
+    [Header("Game Over Retreat Settings")]
+    [Tooltip("Enable retreat (turn Y 180° and move left) when game over occurs.")]
+    [SerializeField] private bool retreatOnGameOver = true;
+    [Tooltip("Speed when retreating backwards to the left after game over.")]
+    [SerializeField] private float retreatSpeed = 6.0f;
+    [Tooltip("Duration of 180° turn animation in seconds.")]
+    [SerializeField] private float retreatTurnDuration = 0.35f;
+    [Tooltip("Use 2D SpriteRenderer flipX instead of 3D Transform Y-rotation to prevent pivot warping.")]
+    [SerializeField] private bool useSpriteFlipX = true;
+
+    // Component Cache
     private Rigidbody2D rb;
     private BoxCollider2D boxCollider;
     private SpriteRenderer spriteRenderer;
-    private bool isThreatActive;
     private Rigidbody2D playerRb;
+
+    // State Variables
+    private bool isThreatActive;
+    private bool isJumping;
+    private bool isRetreating;
+    private float basePositionX;
+    private float currentJumpYOffset;
+    private float currentJumpXOffset;
+    private float currentJumpPitch;
+    private float currentYRotation;
     private Vector3 initialScale = Vector3.one;
+
+    // Tweens
     private Tween squashTween;
     private Tween graceTween;
+    private Tween turnTween;
+    private Sequence jumpSequence;
+
+    public bool IsJumping => isJumping;
+    public bool IsRetreating => isRetreating;
+    public bool IsThreatActive => isThreatActive;
 
     public void Initialize(float speed, float speedIncrease, float maxDistance, float graceDelay)
     {
@@ -54,6 +96,7 @@ public class ChasingThreat : MonoBehaviour
         speedIncreasePerMeter = speedIncrease;
         maxDistanceBehind = maxDistance;
         startGraceDelay = graceDelay;
+        basePositionX = transform.position.x;
     }
 
     private void Awake()
@@ -62,39 +105,169 @@ public class ChasingThreat : MonoBehaviour
         boxCollider = GetComponent<BoxCollider2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         initialScale = transform.localScale;
+        basePositionX = transform.position.x;
+    }
+
+    private void OnEnable()
+    {
+        GameManager.OnGameOver += HandleGameOver;
+    }
+
+    private void OnDisable()
+    {
+        GameManager.OnGameOver -= HandleGameOver;
     }
 
     private void Start()
     {
-        if (playerTransform == null)
-        {
-            GameObject playerObj = GameObject.FindWithTag(playerTag);
-            if (playerObj != null)
-            {
-                playerTransform = playerObj.transform;
-            }
-        }
+        basePositionX = transform.position.x;
+        FindPlayer();
 
-        if (playerTransform != null)
+        if (enableJumpIntro)
         {
-            playerRb = playerTransform.GetComponent<Rigidbody2D>();
+            TriggerJumpIntro();
         }
-
-        // Snap position and slope rotation immediately on start
-        SnapToGround();
+        else
+        {
+            SnapToGround();
+        }
     }
 
     private void OnDestroy()
     {
+        KillAllTweens();
+    }
+
+    private void FindPlayer()
+    {
+        if (playerTransform != null)
+        {
+            playerRb = playerTransform.GetComponent<Rigidbody2D>();
+            return;
+        }
+
+        GameObject playerObj = GameObject.FindWithTag(playerTag);
+        if (playerObj != null)
+        {
+            playerTransform = playerObj.transform;
+            playerRb = playerObj.GetComponent<Rigidbody2D>();
+        }
+    }
+
+    private void HandleGameOver()
+    {
+        if (retreatOnGameOver)
+        {
+            TriggerGameOverRetreat();
+        }
+    }
+
+    public void TriggerGameOverRetreat()
+    {
+        if (isRetreating) return;
+
+        // Synchronize basePositionX to current actual position to eliminate position warping
+        basePositionX = transform.position.x;
+        isRetreating = true;
+
+        jumpSequence?.Kill();
         squashTween?.Kill();
-        graceTween?.Kill();
+        isJumping = false;
+        currentJumpYOffset = 0f;
+        currentJumpXOffset = 0f;
+        currentJumpPitch = 0f;
+
+        turnTween?.Kill();
+        turnTween = DOVirtual.Float(currentYRotation, 180f, retreatTurnDuration, y =>
+        {
+            currentYRotation = y;
+            if (useSpriteFlipX && spriteRenderer != null)
+            {
+                spriteRenderer.flipX = (y >= 90f);
+            }
+        })
+        .SetEase(Ease.OutQuad)
+        .SetLink(gameObject);
+    }
+
+    public void TriggerJumpIntro()
+    {
+        if (!enableJumpIntro) return;
+
+        jumpSequence?.Kill();
+
+        isJumping = true;
+        currentJumpYOffset = startYOffset;
+        currentJumpXOffset = startXOffset;
+        currentJumpPitch = jumpPitchAngle;
+
+        SnapToGround();
+
+        jumpSequence = DOTween.Sequence().SetLink(gameObject);
+
+        if (jumpIntroDelay > 0f)
+        {
+            jumpSequence.AppendInterval(jumpIntroDelay);
+        }
+
+        float upDuration = jumpDuration * 0.45f;
+        float downDuration = jumpDuration * 0.55f;
+
+        jumpSequence.Append(
+            DOVirtual.Float(startYOffset, jumpHeight, upDuration, y => currentJumpYOffset = y)
+                .SetEase(jumpUpEase)
+        );
+        jumpSequence.Join(
+            DOVirtual.Float(startXOffset, landingXOffset, jumpDuration, x => currentJumpXOffset = x)
+                .SetEase(Ease.OutQuad)
+        );
+        jumpSequence.Join(
+            DOVirtual.Float(jumpPitchAngle, -jumpPitchAngle, jumpDuration, pitch => currentJumpPitch = pitch)
+                .SetEase(Ease.InOutSine)
+        );
+        jumpSequence.Append(
+            DOVirtual.Float(jumpHeight, 0f, downDuration, y => currentJumpYOffset = y)
+                .SetEase(jumpDownEase)
+        );
+
+        jumpSequence.OnComplete(() =>
+        {
+            isJumping = false;
+            basePositionX += landingXOffset;
+            currentJumpYOffset = 0f;
+            currentJumpXOffset = 0f;
+            currentJumpPitch = 0f;
+            OnJumpLand();
+        });
+    }
+
+    private void OnJumpLand()
+    {
+        if (CameraFollow.Instance != null)
+        {
+            CameraFollow.Instance.ShakeCamera(0.2f, 0.35f);
+        }
+
+        if (enableSquashAndStretch)
+        {
+            squashTween?.Kill();
+            transform.localScale = initialScale;
+
+            squashTween = transform.DOPunchScale(new Vector3(0.25f, -0.35f, 0f), 0.35f, 6, 0.5f)
+                .OnComplete(() =>
+                {
+                    squashTween = null;
+                    if (isThreatActive) StartPulseAnimation();
+                })
+                .SetLink(gameObject);
+        }
     }
 
     private void ActivateThreat()
     {
         if (isThreatActive) return;
         isThreatActive = true;
-        StartPulseAnimation();
+        if (!isJumping) StartPulseAnimation();
     }
 
     private void StartPulseAnimation()
@@ -117,44 +290,52 @@ public class ChasingThreat : MonoBehaviour
 
     private void SnapToGround()
     {
-        if (DynamicTerrainGenerator.Instance == null) return;
-
-        if (followTerrainCurve)
-        {
-            float targetY = CalculateTargetY(transform.position.x);
-            Vector3 pos = transform.position;
-            pos.y = targetY;
-            transform.position = pos;
-        }
-
-        UpdateSlopeRotation(transform.position.x);
+        float targetX = basePositionX + (isJumping ? currentJumpXOffset : 0f);
+        float yOffset = isJumping ? currentJumpYOffset : 0f;
+        MoveToPosition(targetX, yOffset);
     }
 
     private float CalculateTargetY(float currentX)
     {
         if (DynamicTerrainGenerator.Instance == null) return transform.position.y;
 
-        float sampleX = currentX;
-        float bottomOffset = 0f;
+        float bottomOffset;
 
         if (boxCollider != null)
         {
-            sampleX += boxCollider.offset.x * transform.localScale.x;
             float localBottom = boxCollider.offset.y - (boxCollider.size.y / 2f);
             bottomOffset = localBottom * transform.localScale.y;
         }
         else if (spriteRenderer != null && spriteRenderer.sprite != null)
         {
-            float localBottom = -spriteRenderer.bounds.extents.y;
-            bottomOffset = localBottom;
+            float spriteHeight = spriteRenderer.sprite.rect.height / spriteRenderer.sprite.pixelsPerUnit;
+            float localBottom = -spriteHeight * 0.5f;
+            bottomOffset = localBottom * transform.localScale.y;
         }
         else
         {
             bottomOffset = -0.5f * transform.localScale.y;
         }
 
-        float groundY = DynamicTerrainGenerator.Instance.CalculateHeightAt(sampleX);
+        float groundY = DynamicTerrainGenerator.Instance.CalculateHeightAt(currentX);
         return groundY - bottomOffset + yOffsetFromGround;
+    }
+
+    private void MoveToPosition(float targetX, float extraYOffset = 0f)
+    {
+        float targetY = followTerrainCurve ? CalculateTargetY(targetX) : transform.position.y;
+        Vector2 nextPos = new Vector2(targetX, targetY + extraYOffset);
+
+        if (rb != null && rb.bodyType != RigidbodyType2D.Kinematic)
+        {
+            rb.MovePosition(nextPos);
+        }
+        else
+        {
+            transform.position = nextPos;
+        }
+
+        UpdateSlopeRotation(targetX);
     }
 
     private void UpdateSlopeRotation(float currentX)
@@ -168,31 +349,64 @@ public class ChasingThreat : MonoBehaviour
         Vector2 slopeTangent = new Vector2(delta * 2f, yRight - yLeft).normalized;
         float targetAngle = Mathf.Atan2(slopeTangent.y, slopeTangent.x) * Mathf.Rad2Deg;
 
+        if (isJumping)
+        {
+            targetAngle += currentJumpPitch;
+        }
+
         targetAngle = Mathf.Clamp(targetAngle, -maxTiltAngle, maxTiltAngle);
+
+        bool isFlipped = useSpriteFlipX ? (spriteRenderer != null && spriteRenderer.flipX) : (currentYRotation > 90f);
+        float targetYRot = useSpriteFlipX ? 0f : (isRetreating ? currentYRotation : 0f);
+        float finalZAngle = isFlipped ? -targetAngle : targetAngle;
 
         if (rb != null && rb.bodyType != RigidbodyType2D.Kinematic)
         {
-            float currentAngle = rb.rotation;
-            float smoothAngle = Mathf.LerpAngle(currentAngle, targetAngle, Time.fixedDeltaTime * rotationSpeed);
-            rb.MoveRotation(smoothAngle);
+            float currentZAngle = rb.rotation;
+            float smoothZAngle = Mathf.LerpAngle(currentZAngle, finalZAngle, Time.fixedDeltaTime * rotationSpeed);
+            rb.MoveRotation(smoothZAngle);
+
+            if (!useSpriteFlipX)
+            {
+                Vector3 euler = transform.eulerAngles;
+                euler.y = targetYRot;
+                transform.eulerAngles = euler;
+            }
         }
         else
         {
-            float currentAngle = transform.eulerAngles.z;
-            float smoothAngle = Mathf.LerpAngle(currentAngle, targetAngle, Time.fixedDeltaTime * rotationSpeed);
-            transform.rotation = Quaternion.Euler(0f, 0f, smoothAngle);
+            float currentZAngle = transform.eulerAngles.z;
+            float smoothZAngle = Mathf.LerpAngle(currentZAngle, finalZAngle, Time.fixedDeltaTime * rotationSpeed);
+            transform.rotation = Quaternion.Euler(0f, targetYRot, smoothZAngle);
         }
     }
 
     private void FixedUpdate()
     {
-        if (GameManager.Instance != null && GameManager.Instance.IsGameOver) return;
+        if (GameManager.Instance != null && GameManager.Instance.IsGameOver)
+        {
+            if (retreatOnGameOver && !isRetreating)
+            {
+                TriggerGameOverRetreat();
+            }
 
-        // Keep threat snapped to ground height and slope rotation even before activation
+            if (!isRetreating) return;
+        }
+
+        // 1. Handle Game Over Retreat Movement
+        if (isRetreating)
+        {
+            basePositionX -= retreatSpeed * Time.fixedDeltaTime;
+            MoveToPosition(basePositionX);
+            return;
+        }
+
+        // 2. Handle Idle / Grace Period before Threat Activation
         if (!isThreatActive)
         {
             SnapToGround();
 
+            if (playerTransform == null) FindPlayer();
             if (playerTransform == null) return;
 
             bool hasPlayerInput = Mathf.Abs(Input.GetAxisRaw("Horizontal")) > 0.01f || Input.GetButton("Jump");
@@ -215,40 +429,26 @@ public class ChasingThreat : MonoBehaviour
             return;
         }
 
+        // 3. Active Pursuit Movement
+        if (playerTransform == null) FindPlayer();
         if (playerTransform == null) return;
 
-        // Calculate difficulty scaling speed based on player X position
         float playerX = playerTransform.position.x;
         float extraSpeed = Mathf.Max(0f, playerX * speedIncreasePerMeter);
         float targetSpeed = baseSpeed + extraSpeed;
 
-        // Catch-up logic if player runs too far ahead
-        float distanceBehind = playerX - transform.position.x;
+        float distanceBehind = playerX - basePositionX;
         if (distanceBehind > maxDistanceBehind)
         {
-            // Teleport or catch up smoothly so threat stays on screen edge
             float catchUpSpeed = targetSpeed + (distanceBehind - maxDistanceBehind) * 2f;
             targetSpeed = catchUpSpeed;
         }
 
-        Vector2 nextPos = new Vector2(transform.position.x + targetSpeed * Time.fixedDeltaTime, transform.position.y);
+        basePositionX += targetSpeed * Time.fixedDeltaTime;
 
-        if (followTerrainCurve && DynamicTerrainGenerator.Instance != null)
-        {
-            nextPos.y = CalculateTargetY(nextPos.x);
-        }
-
-        if (rb != null && rb.bodyType != RigidbodyType2D.Kinematic)
-        {
-            rb.MovePosition(nextPos);
-        }
-        else
-        {
-            transform.position = nextPos;
-        }
-
-        // Apply smooth slope rotation matching terrain curves
-        UpdateSlopeRotation(nextPos.x);
+        float targetX = basePositionX + (isJumping ? currentJumpXOffset : 0f);
+        float yOffset = isJumping ? currentJumpYOffset : 0f;
+        MoveToPosition(targetX, yOffset);
     }
 
     private void OnTriggerEnter2D(Collider2D collision)
@@ -268,7 +468,7 @@ public class ChasingThreat : MonoBehaviour
         if (target.CompareTag(playerTag) || target.GetComponent<PlayerMovement>() != null)
         {
             Debug.Log("<color=red>[ChasingThreat] Player caught by threat!</color>");
-            
+
             PlayerTimer playerTimer = target.GetComponent<PlayerTimer>();
             if (playerTimer != null)
             {
@@ -279,7 +479,20 @@ public class ChasingThreat : MonoBehaviour
                 if (CameraFollow.Instance != null) CameraFollow.Instance.ShakeCamera(0.4f, 0.7f);
                 GameManager.Instance.TriggerGameOver();
             }
+
+            if (retreatOnGameOver)
+            {
+                TriggerGameOverRetreat();
+            }
         }
+    }
+
+    private void KillAllTweens()
+    {
+        squashTween?.Kill();
+        graceTween?.Kill();
+        jumpSequence?.Kill();
+        turnTween?.Kill();
     }
 
     private void OnDrawGizmosSelected()
@@ -324,6 +537,29 @@ public class ChasingThreat : MonoBehaviour
             float maxBehindX = playerTransform.position.x - maxDistanceBehind;
             Gizmos.DrawLine(new Vector3(maxBehindX, pos.y - 8f, pos.z), new Vector3(maxBehindX, pos.y + 8f, pos.z));
         }
+
+        // 5. Draw Jump Start and Landing Preview Gizmos
+        if (enableJumpIntro)
+        {
+            float targetBaseX = Application.isPlaying ? basePositionX : pos.x;
+            float targetLandingX = targetBaseX + landingXOffset;
+            float targetStartX = targetBaseX + startXOffset;
+
+            // Draw Landing Target on Terrain Surface (Magenta marker)
+            Gizmos.color = Color.magenta;
+            Vector3 landingGizmoPos = new Vector3(targetLandingX, pos.y, pos.z);
+            if (DynamicTerrainGenerator.Instance != null)
+            {
+                landingGizmoPos.y = DynamicTerrainGenerator.Instance.CalculateHeightAt(targetLandingX);
+            }
+            Gizmos.DrawWireCube(landingGizmoPos, new Vector3(1f, 1f, 0f));
+            Gizmos.DrawSphere(landingGizmoPos, 0.25f);
+
+            // Draw Jump Arc Start Point (Cyan marker)
+            Gizmos.color = Color.cyan;
+            Vector3 startGizmoPos = new Vector3(targetStartX, landingGizmoPos.y + startYOffset, pos.z);
+            Gizmos.DrawWireSphere(startGizmoPos, 0.3f);
+            Gizmos.DrawLine(startGizmoPos, landingGizmoPos);
+        }
     }
 }
-

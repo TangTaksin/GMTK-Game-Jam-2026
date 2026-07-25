@@ -193,13 +193,19 @@ MonoBehaviour:
   maxTiltAngle: 60
   slopeSampleDistance: 0.5
   enableSquashAndStretch: 1
-  basePulseSpeed: 1
-  basePulseAmount: 0.05
-  maxPulseSpeed: 2
-  maxPulseAmount: 0.12
-  enableProximityShake: 1
-  shakeDistanceThreshold: 12
-  maxShakeMagnitude: 0.2
-  groundParticles: {fileID: 0}
-  enableEnragedVisuals: 1
-  enragedColor: {r: 1, g: 0.25, b: 0.25, a: 1}
+  pulseSpeed: 6
+  pulseAmount: 0.05
+  enableJumpIntro: 1
+  jumpIntroDelay: 2
+  jumpHeight: 2.5
+  startYOffset: -7
+  startXOffset: -1
+  landingXOffset: 10
+  jumpDuration: 0.85
+  jumpPitchAngle: 20
+  jumpUpEase: 6
+  jumpDownEase: 5
+  retreatOnGameOver: 1
+  retreatSpeed: 6
+  retreatTurnDuration: 0.35
+  useSpriteFlipX: 1
