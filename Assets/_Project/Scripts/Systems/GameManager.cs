@@ -14,6 +14,8 @@ public class GameManager : MonoBehaviour
 
     [Header("Game Over UI (Optional)")]
     [SerializeField] private GameObject gameOverUI;
+    [Tooltip("Delay in seconds before showing the Game Over UI screen, allowing explosion & blood particles to play out.")]
+    [SerializeField] private float gameOverDelay = 2.0f;
 
     public bool IsGameOver { get; private set; }
     public bool IsGameStarted { get; private set; }
@@ -68,6 +70,33 @@ public class GameManager : MonoBehaviour
         IsGameOver = true;
         Debug.Log("<color=red>[GameManager] Game Over! Press R to Restart.</color>");
 
+        StartCoroutine(RoutineGameOver());
+    }
+
+    private System.Collections.IEnumerator RoutineGameOver()
+    {
+        // 1. Immediately hide Player character sprite and freeze physics on Frame 0!
+        PlayerMovement[] players = FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None);
+        foreach (var player in players)
+        {
+            if (player != null)
+            {
+                SpriteRenderer[] renderers = player.GetComponentsInChildren<SpriteRenderer>();
+                foreach (var sr in renderers)
+                {
+                    sr.enabled = false;
+                }
+
+                Rigidbody2D rb = player.GetComponent<Rigidbody2D>();
+                if (rb != null)
+                {
+                    rb.linearVelocity = Vector2.zero;
+                    rb.simulated = false;
+                }
+                player.enabled = false;
+            }
+        }
+
         PlayerTimer[] bombTimers = FindObjectsByType<PlayerTimer>(FindObjectsSortMode.None);
         foreach (var bomb in bombTimers)
         {
@@ -77,6 +106,13 @@ public class GameManager : MonoBehaviour
             }
         }
 
+        // 2. Delay 2 seconds for explosion particle, blood splatter, and camera shake to finish
+        if (gameOverDelay > 0f)
+        {
+            yield return new WaitForSeconds(gameOverDelay);
+        }
+
+        // 3. Display Game Over UI screen after 2 seconds
         if (gameOverUI != null)
         {
             gameOverUI.SetActive(true);

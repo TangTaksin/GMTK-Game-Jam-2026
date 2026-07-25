@@ -205,8 +205,8 @@ MonoBehaviour:
   jumpPitchAngle: 20
   jumpUpEase: 6
   jumpDownEase: 5
-  bloodParticlePrefab: {fileID: 0}
-  landDustPrefab: {fileID: 0}
+  bloodParticlePrefab: {fileID: 7013404523938715024, guid: 60f70673afe9fed458d136d29d6df524, type: 3}
+  landDustPrefab: {fileID: 6126299654755484747, guid: 510e305193f6fe6458d53ed965da62d7, type: 3}
   retreatOnGameOver: 1
   retreatSpeed: 6
   retreatTurnDuration: 0.35
