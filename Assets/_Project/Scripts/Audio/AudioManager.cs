@@ -83,11 +83,32 @@ public class AudioManager : MonoBehaviour
 
     // ─── SFX Logic ───
 
+    private AudioClip GetClip(string soundName)
+    {
+        if (string.IsNullOrEmpty(soundName)) return null;
+
+        if (sfxDictionary.TryGetValue(soundName, out AudioClip clip))
+            return clip;
+
+        // Fallback: search without spaces or case-insensitive
+        string cleanName = soundName.Replace(" ", "").ToLower();
+        foreach (var kvp in sfxDictionary)
+        {
+            if (kvp.Key.Replace(" ", "").ToLower() == cleanName)
+            {
+                return kvp.Value;
+            }
+        }
+
+        return null;
+    }
+
     public void PlaySFX(string soundName)
     {
         if (sfxSource == null) return;
 
-        if (sfxDictionary.TryGetValue(soundName, out AudioClip clip))
+        AudioClip clip = GetClip(soundName);
+        if (clip != null)
         {
             sfxSource.pitch = Random.Range(minPitch, maxPitch);
             sfxSource.PlayOneShot(clip);
@@ -100,7 +121,8 @@ public class AudioManager : MonoBehaviour
 
     public void PlayLoopingSFX(string soundName, float pitch = 1.0f)
     {
-        if (sfxDictionary.TryGetValue(soundName, out AudioClip clip))
+        AudioClip clip = GetClip(soundName);
+        if (clip != null)
         {
             if (loopSFXSource == null)
             {

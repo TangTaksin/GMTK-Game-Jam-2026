@@ -41,13 +41,27 @@ public class GameOverUI : MonoBehaviour
 
     private void ShowGameOverUI()
     {
+        bool isVictory = GameManager.Instance != null && GameManager.Instance.IsVictory;
+
+        // 🔊 เล่นเสียง GameOver หรือ Win เมื่อขึ้น Panel ผลลัพธ์
+        if (AudioManager.Instance != null)
+        {
+            if (isVictory)
+            {
+                AudioManager.Instance.PlaySFX("Win");
+            }
+            else
+            {
+                AudioManager.Instance.PlaySFX("GameOver");
+            }
+        }
+
         if (gameOverText != null)
         {
             int score = ScoreManager.Instance != null ? ScoreManager.Instance.CurrentScore : 0;
             int distance = ScoreManager.Instance != null ? ScoreManager.Instance.CurrentDistance : 0;
             int highScore = ScoreManager.Instance != null ? ScoreManager.Instance.HighScore : 0;
             bool isNewHigh = ScoreManager.Instance != null && ScoreManager.Instance.IsNewHighScore;
-            bool isVictory = GameManager.Instance != null && GameManager.Instance.IsVictory;
 
             string headerTitle = isVictory
                 ? "<b><color=#FFD700>PENGUIN KABOOM! </color></b>\n<size=85%><color=#00FFCC><b>CONGRATULATIONS!</b></color></size>"
