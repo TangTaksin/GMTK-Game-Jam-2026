@@ -47,16 +47,21 @@ public class GameOverUI : MonoBehaviour
             int distance = ScoreManager.Instance != null ? ScoreManager.Instance.CurrentDistance : 0;
             int highScore = ScoreManager.Instance != null ? ScoreManager.Instance.HighScore : 0;
             bool isNewHigh = ScoreManager.Instance != null && ScoreManager.Instance.IsNewHighScore;
+            bool isVictory = GameManager.Instance != null && GameManager.Instance.IsVictory;
+
+            string headerTitle = isVictory
+                ? "<b><color=#FFD700>PENGUIN KABOOM! </color></b>\n<size=85%><color=#00FFCC><b>CONGRATULATIONS!</b></color></size>"
+                : "<b><color=#FF3333>NOOT NOOT...! </color></b>\n<size=75%><color=#FFAA00>Game Over</color></size>";
 
             string highMsg = isNewHigh ? "<color=#00FFCC><b>NEW HIGH SCORE!</b></color>\n" : "";
 
             gameOverText.text =
-                "<b><color=#FF3333>GAME OVER!</color></b>\n\n" +
+                $"{headerTitle}\n\n" +
                 highMsg +
                 $"<size=80%>Distance: <b>{distance}m</b>\n" +
                 $"Final Score: <b><color=#FFCC00>{score}</color></b>\n" +
                 $"Best Score: <b>{highScore}</b></size>\n\n" +
-                "<size=70%><color=#FFFFFF>Press <b>[R]</b> to Restart</color></size>";
+                "<size=70%><color=#FFFFFF>Press <b>[R]</b> to Play Again</color></size>";
         }
 
         if (container != null)

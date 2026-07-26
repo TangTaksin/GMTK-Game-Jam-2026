@@ -27,6 +27,7 @@ namespace UI
         private void OnEnable()
         {
             ScoreManager.OnScoreUpdated += UpdateScoreText;
+            ScoreManager.OnDistance999Reached += HandleDistance999Reached;
             GameManager.OnGameStart += HandleGameStart;
             GameManager.OnGameOver += HideScoreText;
             CameraFollow.OnCameraPanComplete += HandleCameraPanComplete;
@@ -35,10 +36,21 @@ namespace UI
         private void OnDisable()
         {
             ScoreManager.OnScoreUpdated -= UpdateScoreText;
+            ScoreManager.OnDistance999Reached -= HandleDistance999Reached;
             GameManager.OnGameStart -= HandleGameStart;
             GameManager.OnGameOver -= HideScoreText;
             CameraFollow.OnCameraPanComplete -= HandleCameraPanComplete;
             fadeTween?.Kill();
+        }
+
+        private void HandleDistance999Reached()
+        {
+            if (scoreText != null)
+            {
+                scoreText.transform.DOKill();
+                scoreText.transform.localScale = Vector3.one;
+                scoreText.transform.DOPunchScale(new Vector3(0.5f, 0.5f, 0f), 0.6f, 8, 0.5f).SetUpdate(true);
+            }
         }
 
         private void Start()

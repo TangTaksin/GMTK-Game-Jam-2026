@@ -19,10 +19,12 @@ public class GameManager : MonoBehaviour
 
     public bool IsGameOver { get; private set; }
     public bool IsGameStarted { get; private set; }
+    public bool IsVictory { get; private set; }
 
     public static event System.Action OnGameStart;
     public static event System.Action OnGameOver;
     public static event System.Action OnGameRestart;
+    public static event System.Action OnVictory;
 
     private void Awake()
     {
@@ -61,6 +63,21 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Call this when the player defeats the monster with the Super Bomb!
+    /// </summary>
+    public void TriggerVictory()
+    {
+        if (IsGameOver) return;
+
+        IsVictory = true;
+        IsGameOver = true;
+        Debug.Log("<color=gold>[GameManager] VICTORY! Monster Defeated!</color>");
+
+        OnVictory?.Invoke();
+        StartCoroutine(RoutineGameOver());
+    }
+
+    /// <summary>
     /// Call this when the player dies / explodes.
     /// </summary>
     public void TriggerGameOver()
@@ -75,32 +92,41 @@ public class GameManager : MonoBehaviour
 
     private System.Collections.IEnumerator RoutineGameOver()
     {
-        // 1. Immediately hide Player character sprite and freeze physics on Frame 0!
+        // 1. Immediately handle Player character sprite and physics
         PlayerMovement[] players = FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None);
         foreach (var player in players)
         {
             if (player != null)
             {
-                SpriteRenderer[] renderers = player.GetComponentsInChildren<SpriteRenderer>();
-                foreach (var sr in renderers)
+                if (IsVictory)
                 {
-                    sr.enabled = false;
+                    // Trigger Happy Victory Celebration Animation
+                    player.TriggerVictoryCelebration();
                 }
+                else
+                {
+                    // Hide Player character sprite on Game Over death
+                    SpriteRenderer[] renderers = player.GetComponentsInChildren<SpriteRenderer>();
+                    foreach (var sr in renderers)
+                    {
+                        sr.enabled = false;
+                    }
 
-                Rigidbody2D rb = player.GetComponent<Rigidbody2D>();
-                if (rb != null)
-                {
-                    rb.linearVelocity = Vector2.zero;
-                    rb.simulated = false;
+                    Rigidbody2D rb = player.GetComponent<Rigidbody2D>();
+                    if (rb != null)
+                    {
+                        rb.linearVelocity = Vector2.zero;
+                        rb.simulated = false;
+                    }
+                    player.enabled = false;
                 }
-                player.enabled = false;
             }
         }
 
         PlayerTimer[] bombTimers = FindObjectsByType<PlayerTimer>(FindObjectsSortMode.None);
         foreach (var bomb in bombTimers)
         {
-            if (bomb != null)
+            if (bomb != null && !IsVictory)
             {
                 bomb.gameObject.SetActive(false);
             }

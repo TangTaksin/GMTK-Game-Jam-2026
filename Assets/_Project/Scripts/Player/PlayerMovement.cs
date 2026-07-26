@@ -89,6 +89,10 @@ public class PlayerMovement : MonoBehaviour
     private Vector2 lastSlopeTangent = Vector2.right;
     private Vector3 initialScale = Vector3.one;
 
+    // Obstacle Slowdown Hit State
+    private float slowTimer = 0f;
+    private float currentSlowMultiplier = 1f;
+
     // Intro Jump State Variables
     private bool isIntroJumping;
     private float baseSpawnX;
@@ -100,6 +104,27 @@ public class PlayerMovement : MonoBehaviour
     public bool IsGrounded => isGrounded;
     public Vector2 GroundNormal => groundNormal;
     public bool IsIntroJumping => isIntroJumping;
+    public bool IsSlowed => slowTimer > 0f;
+
+    public void TakeHit(float duration = 0.6f, float speedMult = 0.3f)
+    {
+        slowTimer = duration;
+        currentSlowMultiplier = speedMult;
+
+        if (rb != null)
+        {
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x * speedMult, rb.linearVelocity.y * 0.5f);
+        }
+
+        TriggerJuice(new Vector3(0.25f, -0.25f, 0f));
+
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.DOKill();
+            spriteRenderer.color = Color.red;
+            spriteRenderer.DOColor(Color.white, duration).SetEase(Ease.OutQuad);
+        }
+    }
 
     private void Awake()
     {
@@ -273,6 +298,68 @@ public class PlayerMovement : MonoBehaviour
         });
     }
 
+    /// <summary>
+    /// Freezes player movement and input after dropping the 999m Super Bomb trap, waiting for ChasingThreat to hit it!
+    /// </summary>
+    public void FreezeForTrapWait()
+    {
+        enabled = false;
+        transform.DOKill();
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+            rb.constraints = RigidbodyConstraints2D.FreezeAll;
+            rb.bodyType = RigidbodyType2D.Kinematic;
+        }
+
+        if (spriteRenderer != null && idleSprite != null)
+        {
+            spriteRenderer.sprite = idleSprite;
+        }
+
+        TriggerJuice(landPunchScale);
+    }
+
+    /// <summary>
+    /// Trigger procedural happy cheer & jump bounce animation on victory!
+    /// </summary>
+    public void TriggerVictoryCelebration()
+    {
+        enabled = false;
+        transform.DOKill();
+        transform.rotation = Quaternion.identity;
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+            rb.bodyType = RigidbodyType2D.Kinematic;
+        }
+
+        // Ensure sprite renderers stay visible!
+        SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>();
+        foreach (var sr in renderers)
+        {
+            sr.enabled = true;
+            sr.color = Color.white;
+            if (idleSprite != null) sr.sprite = idleSprite;
+        }
+
+        // Happy victory celebration bounce loop
+        float startY = transform.position.y;
+        Sequence celebrateSeq = DOTween.Sequence().SetUpdate(true).SetLink(gameObject);
+
+        celebrateSeq.Append(transform.DOMoveY(startY + 1.0f, 0.25f).SetEase(Ease.OutQuad));
+        celebrateSeq.Join(transform.DOPunchScale(new Vector3(-0.2f, 0.35f, 0f), 0.25f, 5, 0.5f));
+        celebrateSeq.Append(transform.DOMoveY(startY, 0.22f).SetEase(Ease.InQuad));
+        celebrateSeq.Join(transform.DOPunchScale(new Vector3(0.3f, -0.2f, 0f), 0.22f, 5, 0.5f));
+        celebrateSeq.AppendCallback(() => PlayLandDust());
+        celebrateSeq.AppendInterval(0.1f);
+        celebrateSeq.SetLoops(-1);
+    }
+
     private void OnIntroJumpLand()
     {
         isIntroJumping = false;
@@ -399,9 +486,14 @@ public class PlayerMovement : MonoBehaviour
 
         if (!isGrounded)
         {
-            if (jumpSprite != null)
+            float velY = rb != null ? rb.linearVelocity.y : 0f;
+            if (velY > 0.01f && jumpSprite != null)
             {
                 spriteRenderer.sprite = jumpSprite;
+            }
+            else if (defaultSprite != null)
+            {
+                spriteRenderer.sprite = defaultSprite;
             }
         }
         else
@@ -507,6 +599,11 @@ public class PlayerMovement : MonoBehaviour
         }
 
         CheckGrounded();
+
+        if (slowTimer > 0f)
+        {
+            slowTimer -= Time.fixedDeltaTime;
+        }
 
         // 1. Jump Execution with Coyote Time & Jump Buffer
         bool canJumpFromGround = (isGrounded || coyoteTimer > 0f) && jumpsRemaining == maxJumps;

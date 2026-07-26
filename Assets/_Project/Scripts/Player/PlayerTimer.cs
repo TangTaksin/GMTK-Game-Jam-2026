@@ -46,6 +46,9 @@ public class PlayerTimer : MonoBehaviour
     private Transform targetVisualTransform;
     private bool wasDefusing = false;
 
+    private bool isSuperBombReady = false;
+    private bool isPermanentTrapPlaced = false;
+
     public float CurrentTime => currentTime;
     public int CurrentTimeDisplay => Mathf.CeilToInt(currentTime);
     public int MaxTime => maxTime;
@@ -54,6 +57,8 @@ public class PlayerTimer : MonoBehaviour
     public float GroundRestTimer => groundRestTimer;
     public float ResetGroundDuration => resetGroundDuration;
     public bool IsDefusing => !isHeld && isGrounded && !hasDefusedThisDrop && currentTime < (maxTime - 0.05f) && groundRestTimer < resetGroundDuration;
+    public bool IsSuperBombReady => isSuperBombReady;
+    public bool IsPermanentTrapPlaced => isPermanentTrapPlaced;
 
     private void Awake()
     {
@@ -67,11 +72,70 @@ public class PlayerTimer : MonoBehaviour
     private void OnEnable()
     {
         GameManager.OnGameOver += HandleGameOver;
+        ScoreManager.OnDistance999Reached += EnableSuperBomb;
     }
 
     private void OnDisable()
     {
         GameManager.OnGameOver -= HandleGameOver;
+        ScoreManager.OnDistance999Reached -= EnableSuperBomb;
+    }
+
+    private void EnableSuperBomb()
+    {
+        if (isPermanentTrapPlaced) return;
+        isSuperBombReady = true;
+        currentTime = maxTime;
+        Debug.Log("<color=gold>Press [S]</color>");
+    }
+
+    public void LaunchSuperBomb()
+    {
+        if (!isSuperBombReady || isPermanentTrapPlaced) return;
+
+        isSuperBombReady = false;
+        isPermanentTrapPlaced = true;
+
+        // Position bomb trap to the LEFT of player (behind player towards approaching monster)
+        isHeld = false;
+        if (playerTransform != null)
+        {
+            float trapX = playerTransform.position.x - 3.5f;
+            float trapY = GetTerrainSurfaceY(trapX);
+            transform.position = new Vector3(trapX, trapY, playerTransform.position.z);
+        }
+
+        if (rb != null)
+        {
+            rb.simulated = true;
+            rb.linearVelocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
+
+        // Enable PermanentSuperBomb component on this existing bomb
+        PermanentSuperBomb trap = GetComponent<PermanentSuperBomb>();
+        if (trap == null)
+        {
+            trap = gameObject.AddComponent<PermanentSuperBomb>();
+        }
+        trap.enabled = true;
+
+        // Play drop dust & flash juice
+        DustParticleEffects.PlayLandDust(transform.position);
+
+        // Freeze Player input & movement, waiting for ChasingThreat to run up and hit the bomb!
+        if (playerMovement != null)
+        {
+            playerMovement.FreezeForTrapWait();
+        }
+        else if (playerTransform != null)
+        {
+            PlayerMovement pm = playerTransform.GetComponent<PlayerMovement>();
+            if (pm != null) pm.FreezeForTrapWait();
+        }
+
+        // Keep current time at max so bomb stays stable waiting for monster
+        currentTime = maxTime;
     }
 
     private void HandleGameOver()
@@ -106,6 +170,12 @@ public class PlayerTimer : MonoBehaviour
         if (isExploded) return;
         if (playerTransform == null) FindPlayer();
 
+        // Check for Super Bomb Trigger Input (S key or Down Arrow)
+        if (isSuperBombReady && (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)))
+        {
+            LaunchSuperBomb();
+        }
+
         // Check if player has explicit movement input
         float moveX = Input.GetAxisRaw("Horizontal");
         if (moveX < 0f) moveX = 0f; // Ignore left input
@@ -130,6 +200,21 @@ public class PlayerTimer : MonoBehaviour
         // Player MUST hold bomb if not truly still, airborne (jumping/falling), or in intro jump
         bool shouldHoldBomb = !isPlayerTrulyStill || isAirborne || isIntroJumping;
 
+        // If bomb was placed as a permanent trap, freeze timer and stay on ground!
+        if (isPermanentTrapPlaced)
+        {
+            currentTime = maxTime;
+            CheckGrounded();
+            UpdateDefuseAnimation();
+            return;
+        }
+
+        // If Super Bomb is ready, freeze timer countdown at maxTime!
+        if (isSuperBombReady)
+        {
+            currentTime = maxTime;
+        }
+
         // Auto PickUp when moving, Auto Drop when stopped
         if (shouldHoldBomb)
         {
@@ -142,7 +227,7 @@ public class PlayerTimer : MonoBehaviour
             groundRestTimer = 0f;
 
             // Timer counts down while carrying and moving
-            if (!isIntroJumping)
+            if (!isIntroJumping && !isSuperBombReady)
             {
                 currentTime -= Time.deltaTime;
             }
@@ -189,6 +274,15 @@ public class PlayerTimer : MonoBehaviour
         {
             Explode();
         }
+    }
+
+    /// <summary>
+    /// Deducts time from bomb timer when hit by an obstacle.
+    /// </summary>
+    public void DeductTime(float amount)
+    {
+        if (isExploded || isSuperBombReady || isPermanentTrapPlaced) return;
+        currentTime = Mathf.Max(0f, currentTime - amount);
     }
 
     private void UpdateDefuseAnimation()

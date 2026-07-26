@@ -223,6 +223,12 @@ public class DynamicTerrainGenerator : MonoBehaviour
         // Generate initial terrain around player spawn
         GenerateTerrainAhead();
         UpdateComponents();
+
+        // Auto-ensure Cookie Run ObstacleSpawner is active
+        if (GetComponent<ObstacleSpawner>() == null && ObstacleSpawner.Instance == null)
+        {
+            gameObject.AddComponent<ObstacleSpawner>();
+        }
     }
 
     private void CreateLeftBoundaryWall()
@@ -243,7 +249,15 @@ public class DynamicTerrainGenerator : MonoBehaviour
                 threatComponent = wallObj.AddComponent<ChasingThreat>();
             }
 
-            leftWallTransform.position = new Vector3(leftWallX, baseHeight + leftWallHeight / 2f, 0f);
+            leftWallTransform.position = new Vector3(leftWallX, baseHeight + leftWallHeight / 2f, -0.1f);
+
+            // Apply threatSortingLayer and threatSortingOrder to all SpriteRenderers on Threat
+            SpriteRenderer[] srs = wallObj.GetComponentsInChildren<SpriteRenderer>();
+            foreach (var sr in srs)
+            {
+                sr.sortingLayerName = threatSortingLayer;
+                sr.sortingOrder = threatSortingOrder;
+            }
         }
         else
         {
@@ -252,7 +266,7 @@ public class DynamicTerrainGenerator : MonoBehaviour
             wallObj.transform.SetParent(transform, false);
             leftWallTransform = wallObj.transform;
 
-            leftWallTransform.position = new Vector3(leftWallX, baseHeight + leftWallHeight / 2f, 0f);
+            leftWallTransform.position = new Vector3(leftWallX, baseHeight + leftWallHeight / 2f, -0.1f);
 
             BoxCollider2D wallCollider = wallObj.AddComponent<BoxCollider2D>();
             wallCollider.size = new Vector2(leftWallWidth, leftWallHeight);

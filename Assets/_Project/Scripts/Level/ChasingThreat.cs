@@ -53,6 +53,12 @@ public class ChasingThreat : MonoBehaviour
     [SerializeField] private Ease jumpUpEase = Ease.OutQuad;
     [SerializeField] private Ease jumpDownEase = Ease.InQuad;
 
+    [Header("Sorting Layer Settings")]
+    [Tooltip("Sorting layer name for threat sprite renderer.")]
+    [SerializeField] private string threatSortingLayer = "Default";
+    [Tooltip("Sorting order for threat sprite renderer (set to 10 or higher to render in front of ground fill).")]
+    [SerializeField] private int threatSortingOrder = 10;
+
     [Header("VFX / Hit Settings")]
     [SerializeField] private ParticleSystem bloodParticlePrefab;
     [SerializeField] private ParticleSystem landDustPrefab;
@@ -82,6 +88,7 @@ public class ChasingThreat : MonoBehaviour
     private float currentJumpXOffset;
     private float currentJumpPitch;
     private float currentYRotation;
+    private float stunTimer = 0f;
     private Vector3 initialScale = Vector3.one;
 
     // Tweens
@@ -90,9 +97,12 @@ public class ChasingThreat : MonoBehaviour
     private Tween turnTween;
     private Sequence jumpSequence;
 
+    public static ChasingThreat Instance { get; private set; }
+
     public bool IsJumping => isJumping;
     public bool IsRetreating => isRetreating;
     public bool IsThreatActive => isThreatActive;
+    public bool IsStunned => stunTimer > 0f;
 
     public void Initialize(float speed, float speedIncrease, float maxDistance, float graceDelay)
     {
@@ -105,11 +115,27 @@ public class ChasingThreat : MonoBehaviour
 
     private void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            // Update reference if needed
+            Instance = this;
+        }
+        else
+        {
+            Instance = this;
+        }
+
         rb = GetComponent<Rigidbody2D>();
         boxCollider = GetComponent<BoxCollider2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         initialScale = transform.localScale;
         basePositionX = transform.position.x;
+
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.sortingLayerName = threatSortingLayer;
+            spriteRenderer.sortingOrder = threatSortingOrder;
+        }
 
         if (rb != null)
         {
@@ -516,6 +542,14 @@ public class ChasingThreat : MonoBehaviour
             return;
         }
 
+        // 2. Handle Stun from Super Bomb Blast
+        if (stunTimer > 0f)
+        {
+            stunTimer -= Time.fixedDeltaTime;
+            SnapToGround();
+            return;
+        }
+
         // 2. Handle Idle / Grace Period before Threat Activation
         if (!isThreatActive)
         {
@@ -583,7 +617,12 @@ public class ChasingThreat : MonoBehaviour
 
     private void CheckPlayerCollision(GameObject target)
     {
-        if (GameManager.Instance != null && GameManager.Instance.IsGameOver) return;
+        if (GameManager.Instance != null && (GameManager.Instance.IsGameOver || GameManager.Instance.IsVictory)) return;
+
+        // Ignore player collision if permanent bomb trap is placed
+        PlayerTimer pt = target.GetComponent<PlayerTimer>();
+        if (pt == null) pt = target.GetComponentInChildren<PlayerTimer>();
+        if (pt != null && pt.IsPermanentTrapPlaced) return;
 
         if (target.CompareTag(playerTag) || target.GetComponent<PlayerMovement>() != null)
         {
@@ -626,6 +665,36 @@ public class ChasingThreat : MonoBehaviour
                 TriggerGameOverRetreat();
             }
         }
+    }
+
+    /// <summary>
+    /// Knocks back and stuns ChasingThreat when player detonates the 999m Super Bomb!
+    /// </summary>
+    public void TakeBombBlast(float knockbackDistance = 35f, float stunDuration = 5.0f)
+    {
+        basePositionX -= knockbackDistance;
+        stunTimer = stunDuration;
+
+        if (CameraFollow.Instance != null)
+        {
+            CameraFollow.Instance.ShakeCamera(0.6f, 0.7f);
+        }
+
+        transform.DOKill();
+        transform.DOPunchScale(new Vector3(0.5f, -0.5f, 0f), 0.5f, 8, 0.5f);
+
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.DOKill();
+            spriteRenderer.color = Color.red;
+            spriteRenderer.DOColor(Color.white, 0.8f);
+        }
+
+        Vector3 hitPos = transform.position;
+        DustParticleEffects.PlayExplosion(hitPos);
+        DustParticleEffects.PlayBloodSplatter(hitPos);
+
+        SnapToGround();
     }
 
     private void KillAllTweens()

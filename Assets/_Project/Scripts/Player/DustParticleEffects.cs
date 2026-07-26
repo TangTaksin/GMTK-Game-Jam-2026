@@ -27,7 +27,10 @@ public static class DustParticleEffects
         pObj.transform.position = position;
 
         ParticleSystem ps = pObj.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
         var main = ps.main;
+        main.playOnAwake = false;
         main.duration = 0.2f;
         main.loop = false;
         main.startLifetime = new ParticleSystem.MinMaxCurve(0.2f, 0.35f);
@@ -72,7 +75,10 @@ public static class DustParticleEffects
         pObj.transform.position = position;
 
         ParticleSystem ps = pObj.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
         var main = ps.main;
+        main.playOnAwake = false;
         main.duration = 0.2f;
         main.loop = false;
         main.startLifetime = new ParticleSystem.MinMaxCurve(0.25f, 0.4f);
@@ -116,7 +122,10 @@ public static class DustParticleEffects
         expObj.transform.position = position;
 
         ParticleSystem ps = expObj.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
         var main = ps.main;
+        main.playOnAwake = false;
         main.duration = 0.6f;
         main.loop = false;
         main.startLifetime = new ParticleSystem.MinMaxCurve(0.4f, 0.7f);
@@ -165,7 +174,10 @@ public static class DustParticleEffects
         bObj.transform.position = position;
 
         ParticleSystem ps = bObj.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
         var main = ps.main;
+        main.playOnAwake = false;
         main.duration = 0.5f;
         main.loop = false;
         main.startLifetime = new ParticleSystem.MinMaxCurve(0.3f, 0.7f);

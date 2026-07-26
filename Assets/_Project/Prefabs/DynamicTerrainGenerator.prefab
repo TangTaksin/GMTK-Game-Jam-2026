@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 1425770841888359409}
   - component: {fileID: 8110446558925068676}
   - component: {fileID: 8884748540022305066}
+  - component: {fileID: 961459210796295104}
   m_Layer: 3
   m_Name: DynamicTerrainGenerator
   m_TagString: Untagged
@@ -206,22 +207,54 @@ MonoBehaviour:
   fillDepth: 10
   groundMaterial: {fileID: 2100000, guid: 315d05a963f27194ab663f4b67c5c03f, type: 2}
   groundColor: {r: 1, g: 1, b: 1, a: 1}
-  groundSortingLayer: Default
-  groundSortingOrder: 0
+  groundSortingLayer: Player
+  groundSortingOrder: 10
+  enableWater: 0
+  waterLevelY: -5
+  waterDepth: 7.9
+  fillValleysOnly: 0
+  waterMaterial: {fileID: 2100000, guid: dfcb90d284472304dbe71c8c75697b16, type: 2}
+  waterSortingLayer: Player
+  waterSortingOrder: 2
   initialSafeZoneEnd: 15
   flatZoneLength: 8
   slopeZoneLength: 16
   transitionLength: 4
-  startBehindOffset: 10
+  startBehindOffset: 7
   createLeftWall: 1
   enableChasingThreat: 1
-  leftWallX: -10
+  leftWallX: -15
+  leftWallWidth: 67
   leftWallHeight: 4
   threatBaseSpeed: 2.5
   threatSpeedIncreasePerMeter: 0.005
   threatMaxDistanceBehind: 25
   threatStartGraceDelay: 2
-  threatSprite: {fileID: 21300000, guid: ba31b6a4d88ef3142ab87d3ffadebeba, type: 3}
+  threatPrefab: {fileID: 4774978051831431793, guid: f8a2a4f01747c654297e262d30337a60, type: 3}
+  threatSprite: {fileID: 6198341673881352183, guid: 7d45bd41dc310794c87b9aaccfe6e400, type: 3}
   threatColor: {r: 1, g: 1, b: 1, a: 1}
   threatSortingLayer: Default
   threatSortingOrder: 10
+--- !u!114 &961459210796295104
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2390056408439983122}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e7f32e2ac1fcbd04492d5cd38998c2a8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ObstacleSpawner
+  player: {fileID: 0}
+  generateAheadDistance: 35
+  removeBehindDistance: 30
+  initialSafeZoneEnd: 20
+  minInterval: 12
+  maxInterval: 20
+  groundYOffset: 0.5
+  zOffset: 0.15
+  obstacleSortingLayer: Default
+  obstacleSortingOrder: -1
+  groundObstaclePrefab: {fileID: 2700232295265288087, guid: 43d31c859eaaf7d448642ca46fd29819, type: 3}

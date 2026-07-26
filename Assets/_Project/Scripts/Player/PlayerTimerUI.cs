@@ -10,6 +10,10 @@ public class PlayerTimerUI : MonoBehaviour
     [SerializeField] private Color normalColor = Color.black;
     [SerializeField] private Color warningColor = Color.red;
     [SerializeField] private Color resetColor = Color.green;
+    [Header("Super Bomb Prompt Settings")]
+    [SerializeField] private string superBombPromptText = "PRESS [S]!";
+    [Tooltip("Extra Y height offset applied to prompt text when Super Bomb is ready.")]
+    [SerializeField] private float superBombExtraYOffset = 0.5f;
 
     private int lastTime = -1;
     private Vector3 initialScale = Vector3.one;
@@ -52,11 +56,31 @@ public class PlayerTimerUI : MonoBehaviour
             if (playerTimer == null) return;
         }
 
+        // Calculate position offset (float 0.5 units higher when Super Bomb is ready)
+        Vector3 targetOffset = offset;
+        if (playerTimer.IsSuperBombReady)
+        {
+            targetOffset += new Vector3(0f, superBombExtraYOffset, 0f);
+        }
+
         // Follow bomb position & lock rotation
-        timerText.transform.position = playerTimer.transform.position + offset;
+        timerText.transform.position = playerTimer.transform.position + targetOffset;
         timerText.transform.rotation = Quaternion.identity;
 
-        if (playerTimer.IsDefusing)
+        if (playerTimer.IsSuperBombReady)
+        {
+            timerText.color = Color.yellow;
+            timerText.text = superBombPromptText;
+
+            if (lastTime != 999)
+            {
+                lastTime = 999;
+                timerText.transform.DOKill();
+                timerText.transform.localScale = initialScale;
+                timerText.transform.DOPunchScale(Vector3.one * 0.5f, 0.4f, 6, 0.5f).SetLoops(-1, LoopType.Yoyo).SetLink(timerText.gameObject);
+            }
+        }
+        else if (playerTimer.IsDefusing)
         {
             // Reset charging state on ground while defusing
             float remainingRest = Mathf.Max(0f, playerTimer.ResetGroundDuration - playerTimer.GroundRestTimer);
