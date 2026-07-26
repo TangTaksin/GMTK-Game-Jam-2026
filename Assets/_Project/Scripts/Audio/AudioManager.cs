@@ -23,7 +23,7 @@ public class AudioManager : MonoBehaviour
 
     [Header("SFX Library")]
     public List<SoundClip> sfxLibrary = new List<SoundClip>();
-    private Dictionary<string, AudioClip> sfxDictionary = new Dictionary<string, AudioClip>();
+    private Dictionary<string, SoundClip> sfxDictionary = new Dictionary<string, SoundClip>();
 
     private Coroutine activeMusicRoutine;
 
@@ -38,7 +38,7 @@ public class AudioManager : MonoBehaviour
             foreach (var item in sfxLibrary)
             {
                 if (item != null && item.clip != null && !string.IsNullOrEmpty(item.name) && !sfxDictionary.ContainsKey(item.name))
-                    sfxDictionary.Add(item.name, item.clip);
+                    sfxDictionary.Add(item.name, item);
             }
         }
         else
@@ -83,12 +83,12 @@ public class AudioManager : MonoBehaviour
 
     // ─── SFX Logic ───
 
-    private AudioClip GetClip(string soundName)
+    private SoundClip GetSoundClip(string soundName)
     {
         if (string.IsNullOrEmpty(soundName)) return null;
 
-        if (sfxDictionary.TryGetValue(soundName, out AudioClip clip))
-            return clip;
+        if (sfxDictionary.TryGetValue(soundName, out SoundClip soundClip))
+            return soundClip;
 
         // Fallback: search without spaces or case-insensitive
         string cleanName = soundName.Replace(" ", "").ToLower();
@@ -103,15 +103,21 @@ public class AudioManager : MonoBehaviour
         return null;
     }
 
-    public void PlaySFX(string soundName)
+    private AudioClip GetClip(string soundName)
+    {
+        SoundClip soundClip = GetSoundClip(soundName);
+        return soundClip != null ? soundClip.clip : null;
+    }
+
+    public void PlaySFX(string soundName, float volumeMultiplier = 1.0f)
     {
         if (sfxSource == null) return;
 
-        AudioClip clip = GetClip(soundName);
-        if (clip != null)
+        SoundClip soundClip = GetSoundClip(soundName);
+        if (soundClip != null && soundClip.clip != null)
         {
             sfxSource.pitch = Random.Range(minPitch, maxPitch);
-            sfxSource.PlayOneShot(clip);
+            sfxSource.PlayOneShot(soundClip.clip, soundClip.volume * volumeMultiplier);
         }
         else
         {
@@ -121,8 +127,8 @@ public class AudioManager : MonoBehaviour
 
     public void PlayLoopingSFX(string soundName, float pitch = 1.0f)
     {
-        AudioClip clip = GetClip(soundName);
-        if (clip != null)
+        SoundClip soundClip = GetSoundClip(soundName);
+        if (soundClip != null && soundClip.clip != null)
         {
             if (loopSFXSource == null)
             {
@@ -135,10 +141,11 @@ public class AudioManager : MonoBehaviour
             }
 
             loopSFXSource.pitch = pitch;
+            loopSFXSource.volume = soundClip.volume;
 
-            if (loopSFXSource.clip == clip && loopSFXSource.isPlaying) return;
+            if (loopSFXSource.clip == soundClip.clip && loopSFXSource.isPlaying) return;
 
-            loopSFXSource.clip = clip;
+            loopSFXSource.clip = soundClip.clip;
             loopSFXSource.loop = true;
             loopSFXSource.Play();
         }
@@ -155,6 +162,21 @@ public class AudioManager : MonoBehaviour
             loopSFXSource.Stop();
             loopSFXSource.clip = null;
         }
+    }
+
+    public void SetSFXVolume(string soundName, float volume)
+    {
+        SoundClip soundClip = GetSoundClip(soundName);
+        if (soundClip != null)
+        {
+            soundClip.volume = Mathf.Clamp01(volume);
+        }
+    }
+
+    public float GetSFXVolume(string soundName)
+    {
+        SoundClip soundClip = GetSoundClip(soundName);
+        return soundClip != null ? soundClip.volume : 1.0f;
     }
 
     // ─── Fading Coroutines ───
@@ -210,4 +232,6 @@ public class SoundClip
 {
     public string name;
     public AudioClip clip;
+    [Range(0f, 1f)]
+    public float volume = 1.0f;
 }
