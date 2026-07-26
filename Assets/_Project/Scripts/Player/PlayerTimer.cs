@@ -195,7 +195,7 @@ public class PlayerTimer : MonoBehaviour
         // Check if player has explicit movement input
         float moveX = Input.GetAxisRaw("Horizontal");
         if (moveX < 0f) moveX = 0f; // Ignore left input
-        bool hasInput = moveX > 0.05f || Input.GetButton("Jump");
+        bool hasInput = moveX > 0.05f || Input.GetButton("Jump") || Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow);
 
         bool isPlayerGrounded = playerMovement != null ? playerMovement.IsGrounded : true;
         bool isAirborne = !isPlayerGrounded;

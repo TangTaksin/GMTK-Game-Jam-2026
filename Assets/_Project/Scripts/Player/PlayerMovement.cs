@@ -489,7 +489,7 @@ public class PlayerMovement : MonoBehaviour
 
         if (GameManager.Instance != null && GameManager.Instance.IsGameOver) return;
 
-        if (Input.GetButtonDown("Jump"))
+        if (Input.GetButtonDown("Jump") || Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
         {
             jumpBufferTimer = jumpBufferTime;
         }
