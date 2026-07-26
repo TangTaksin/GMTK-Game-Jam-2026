@@ -93,6 +93,13 @@ public class PlayerTimer : MonoBehaviour
         isSuperBombReady = true;
         currentTime = maxTime;
         Debug.Log("<color=gold>Press [S]</color>");
+
+        // 🔊 เล่นเสียง BombDefuse เมื่อ Super Bomb พร้อมใช้งานที่ 999m
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.StopLoopingSFX();
+            AudioManager.Instance.PlaySFX("BombDefuse");
+        }
     }
 
     public void LaunchSuperBomb()
@@ -131,6 +138,12 @@ public class PlayerTimer : MonoBehaviour
 
         // Play drop dust & flash juice
         DustParticleEffects.PlayLandDust(transform.position);
+
+        // 🔊 เล่นเสียง PlayerLand เมื่อกดปุ่ม S วางกับดักระเบิดลงพื้น
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX("PlayerLand");
+        }
 
         // Freeze Player input & movement, waiting for ChasingThreat to run up and hit the bomb!
         if (playerMovement != null)
@@ -215,6 +228,13 @@ public class PlayerTimer : MonoBehaviour
             currentTime = maxTime;
             CheckGrounded();
             UpdateDefuseAnimation();
+
+            // 🔊 Handle Bomb Fuse sound loop for Permanent Super Bomb Trap
+            if (AudioManager.Instance != null && GameManager.Instance != null && GameManager.Instance.IsGameStarted && !isExploded)
+            {
+                AudioManager.Instance.PlayLoopingSFX("BombFuse", fuseAudioPitch);
+            }
+
             return;
         }
 
@@ -284,8 +304,8 @@ public class PlayerTimer : MonoBehaviour
             }
         }
 
-        // Handle Bomb Fuse & Defusing sound loops
-        bool isFuseActive = shouldHoldBomb && !isIntroJumping && !isSuperBombReady && !isPermanentTrapPlaced && !isExploded && (GameManager.Instance != null && GameManager.Instance.IsGameStarted);
+        // Handle Bomb Fuse & Defusing sound loops (includes active fuse while Permanent Trap is waiting for ChasingThreat)
+        bool isFuseActive = (shouldHoldBomb || isPermanentTrapPlaced) && !isIntroJumping && !isSuperBombReady && !isExploded && (GameManager.Instance != null && GameManager.Instance.IsGameStarted);
         bool isDefusingActive = IsDefusing && !isExploded && (GameManager.Instance != null && GameManager.Instance.IsGameStarted);
 
         if (isFuseActive)

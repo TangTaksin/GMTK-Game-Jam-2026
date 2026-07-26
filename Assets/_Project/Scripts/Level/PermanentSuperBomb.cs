@@ -68,6 +68,14 @@ public class PermanentSuperBomb : MonoBehaviour
 
             Vector3 hitPos = transform.position;
 
+            // 🔊 เล่นเสียง BombExplode และ MonsterRoar เมื่อมอนสเตอร์ ChasingThreat วิ่งมาชนกับ Super Bomb!
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.StopLoopingSFX();
+                AudioManager.Instance.PlaySFX("BombExplode");
+                AudioManager.Instance.PlaySFX("MonsterRoar");
+            }
+
             // 1. Play massive explosion VFX
             if (explosionPrefab != null)
             {

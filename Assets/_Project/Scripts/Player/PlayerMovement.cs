@@ -456,7 +456,11 @@ public class PlayerMovement : MonoBehaviour
 
     private void PlayLandDust()
     {
-        if (AudioManager.Instance != null) AudioManager.Instance.PlaySFX("PlayerLand");
+        // 🔊 ไม่เล่นเสียง PlayerLand ในช่วงฉลองชัยชนะ (Victory Celebration)
+        if (GameManager.Instance == null || !GameManager.Instance.IsVictory)
+        {
+            if (AudioManager.Instance != null) AudioManager.Instance.PlaySFX("PlayerLand");
+        }
 
         if (!enableDustParticles) return;
         Vector3 spawnPos = transform.position + feetOffset;
