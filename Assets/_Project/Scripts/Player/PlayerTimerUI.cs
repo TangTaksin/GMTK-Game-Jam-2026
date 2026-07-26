@@ -10,6 +10,7 @@ public class PlayerTimerUI : MonoBehaviour
     [SerializeField] private Color normalColor = Color.black;
     [SerializeField] private Color warningColor = Color.red;
     [SerializeField] private Color resetColor = Color.green;
+    [SerializeField] private int warningTimeThreshold = 6;
     [Header("Super Bomb Prompt Settings")]
     [SerializeField] private string superBombPromptText = "PRESS [S]!";
     [Tooltip("Extra Y height offset applied to prompt text when Super Bomb is ready.")]
@@ -107,7 +108,7 @@ public class PlayerTimerUI : MonoBehaviour
                 timerText.text = time.ToString();
 
                 // Color warning and pulse animation on countdown
-                if (time <= 3 && time > 0)
+                if (time <= warningTimeThreshold && time > 0)
                 {
                     timerText.color = warningColor;
 

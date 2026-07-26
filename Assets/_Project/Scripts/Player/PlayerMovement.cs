@@ -117,6 +117,7 @@ public class PlayerMovement : MonoBehaviour
         }
 
         TriggerJuice(new Vector3(0.25f, -0.25f, 0f));
+        if (AudioManager.Instance != null) AudioManager.Instance.PlaySFX("PlayerHit");
 
         if (spriteRenderer != null)
         {
@@ -252,8 +253,6 @@ public class PlayerMovement : MonoBehaviour
         currentJumpXOffset = startXOffset;
         currentJumpPitch = jumpPitchAngle;
 
-        PlayJumpDust();
-
         if (spriteRenderer != null && jumpSprite != null)
         {
             spriteRenderer.sprite = jumpSprite;
@@ -271,6 +270,12 @@ public class PlayerMovement : MonoBehaviour
         {
             jumpSequence.AppendInterval(jumpIntroDelay);
         }
+
+        // 🔊 เล่นเสียงและสร้าง Dust/Water FX ตรงจังหวะที่เริ่มพุ่งขึ้นจริง
+        jumpSequence.AppendCallback(() =>
+        {
+            PlayJumpDust();
+        });
 
         float upDuration = jumpDuration * 0.45f;
         float downDuration = jumpDuration * 0.55f;
@@ -360,6 +365,8 @@ public class PlayerMovement : MonoBehaviour
         celebrateSeq.SetLoops(-1);
     }
 
+    public static event System.Action OnPlayerIntroLand;
+
     private void OnIntroJumpLand()
     {
         isIntroJumping = false;
@@ -384,6 +391,8 @@ public class PlayerMovement : MonoBehaviour
         {
             CameraFollow.Instance.ShakeCamera(0.2f, 0.35f);
         }
+
+        OnPlayerIntroLand?.Invoke();
     }
 
     private void UpdateIntroPosition()
@@ -425,6 +434,12 @@ public class PlayerMovement : MonoBehaviour
 
     private void PlayJumpDust()
     {
+        if (AudioManager.Instance != null)
+        {
+            string jumpSFX = isIntroJumping ? "PlayerJumpUpWater" : "PlayerJump";
+            AudioManager.Instance.PlaySFX(jumpSFX);
+        }
+
         if (!enableDustParticles) return;
         Vector3 spawnPos = transform.position + feetOffset;
         if (jumpDustPrefab != null)
@@ -441,6 +456,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void PlayLandDust()
     {
+        if (AudioManager.Instance != null) AudioManager.Instance.PlaySFX("PlayerLand");
+
         if (!enableDustParticles) return;
         Vector3 spawnPos = transform.position + feetOffset;
         if (landDustPrefab != null)

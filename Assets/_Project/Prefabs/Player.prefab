@@ -207,7 +207,7 @@ MonoBehaviour:
   maxDownhillSpeed: 22
   downhillBoost: 25
   iceDrag: 15
-  jumpForce: 5
+  jumpForce: 6
   maxJumps: 2
   groundLayer:
     serializedVersion: 2
@@ -241,7 +241,7 @@ MonoBehaviour:
   jumpDustPrefab: {fileID: 1229810220630162446, guid: 803d59a282f47ef47805a4d1a4ff2b9f, type: 3}
   landDustPrefab: {fileID: 6126299654755484747, guid: 510e305193f6fe6458d53ed965da62d7, type: 3}
   enableJumpIntro: 1
-  jumpIntroDelay: 2
+  jumpIntroDelay: 0
   jumpHeight: 3
   startYOffset: -1.6
   startXOffset: -11.78

@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 using DG.Tweening;
 
@@ -139,6 +141,12 @@ public class StartMenuUI : MonoBehaviour
             logoTransform.anchoredPosition = initialLogoPos + new Vector3(0f, yOffset, 0f);
         }
 
+        // Do not start game if game is currently paused (e.g. Settings panel is open)
+        if (Time.timeScale == 0f) return;
+
+        // Do not start game if pointer is over another blocking UI element (e.g. Settings button, volume sliders, Settings menu)
+        if (IsPointerOverBlockingUI()) return;
+
         // Detect click anywhere on screen or touch or space/enter key
         if (Input.GetMouseButtonDown(0) || 
             (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began) || 
@@ -147,6 +155,32 @@ public class StartMenuUI : MonoBehaviour
         {
             StartGameSequence();
         }
+    }
+
+    /// <summary>
+    /// Checks if the cursor/touch is over a UI element outside of this StartMenuUI panel (e.g. Settings button).
+    /// </summary>
+    private bool IsPointerOverBlockingUI()
+    {
+        if (EventSystem.current == null) return false;
+
+        PointerEventData eventData = new PointerEventData(EventSystem.current)
+        {
+            position = Input.mousePosition
+        };
+
+        List<RaycastResult> results = new List<RaycastResult>();
+        EventSystem.current.RaycastAll(eventData, results);
+
+        foreach (RaycastResult result in results)
+        {
+            if (result.gameObject != null && !result.gameObject.transform.IsChildOf(transform))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -162,6 +196,12 @@ public class StartMenuUI : MonoBehaviour
         if (clickToStartText != null)
         {
             clickToStartText.transform.DOPunchScale(new Vector3(0.2f, 0.2f, 0f), 0.2f, 1, 0.5f);
+        }
+
+        // Play Game Start sound effect
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX("GameStart");
         }
 
         // Trigger Game Start event on GameManager

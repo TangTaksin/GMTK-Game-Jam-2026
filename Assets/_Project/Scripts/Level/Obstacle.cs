@@ -3,11 +3,12 @@ using DG.Tweening;
 
 public enum ObstacleType
 {
-    GroundSpike // Low obstacle: Must jump over
+    GroundSpike, // Low obstacle: Must jump over
+    CeilingSpike // Falling ceiling / overhead hazard
 }
 
 /// <summary>
-/// Cookie Run style ground obstacle component.
+/// Cookie Run style ground & falling ceiling obstacle component.
 /// Collides with player, applies speed slowdown, deducts bomb timer, and triggers visual juice.
 /// </summary>
 [RequireComponent(typeof(Collider2D))]
@@ -15,6 +16,8 @@ public class Obstacle : MonoBehaviour
 {
     [Header("Obstacle Properties")]
     [SerializeField] private ObstacleType obstacleType = ObstacleType.GroundSpike;
+    [Tooltip("Custom SFX to play on hit or fall (leaves empty to use default per obstacle type).")]
+    [SerializeField] private string customSFX = "";
     
     [Tooltip("Seconds deducted from PlayerTimer when hit.")]
     [SerializeField] private float timeDeduction = 1.0f;
@@ -133,10 +136,30 @@ public class Obstacle : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Call this to play the Ceiling_Fall sound effect when a ceiling obstacle falls.
+    /// </summary>
+    public void TriggerFallSFX()
+    {
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX("Ceiling_Fall");
+        }
+    }
+
     private void OnHitPlayer(GameObject playerObj)
     {
         hasBeenHit = true;
         if (col != null) col.enabled = false;
+
+        if (AudioManager.Instance != null)
+        {
+            string sfxToPlay = !string.IsNullOrEmpty(customSFX) 
+                ? customSFX 
+                : (obstacleType == ObstacleType.CeilingSpike ? "Ceiling_Fall" : "ObstacleBreak");
+
+            AudioManager.Instance.PlaySFX(sfxToPlay);
+        }
 
         Debug.Log("<color=orange>[Obstacle] Player hit GroundSpike!</color>");
 

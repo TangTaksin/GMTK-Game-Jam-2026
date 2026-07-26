@@ -196,15 +196,17 @@ MonoBehaviour:
   pulseSpeed: 6
   pulseAmount: 0.05
   enableJumpIntro: 1
-  jumpIntroDelay: 5
-  jumpHeight: 2.5
+  jumpIntroDelay: 3
+  jumpHeight: 3
   startYOffset: -5
   startXOffset: -3
   landingXOffset: 12.4
-  jumpDuration: 0.85
+  jumpDuration: 0.9
   jumpPitchAngle: 20
   jumpUpEase: 6
   jumpDownEase: 5
+  threatSortingLayer: Default
+  threatSortingOrder: 10
   bloodParticlePrefab: {fileID: 7013404523938715024, guid: 60f70673afe9fed458d136d29d6df524, type: 3}
   landDustPrefab: {fileID: 6126299654755484747, guid: 510e305193f6fe6458d53ed965da62d7, type: 3}
   retreatOnGameOver: 1

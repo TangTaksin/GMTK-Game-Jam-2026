@@ -25,8 +25,12 @@ public class PlayerTimer : MonoBehaviour
     [Tooltip("Downward vertical offset applied while defusing to keep feet grounded.")]
     [SerializeField] private float defuseYOffset = 0.0f;
 
-    [Header("Explosion Particle Settings")]
+    [Header("Explosion & Audio Settings")]
     [SerializeField] private ParticleSystem explosionParticlePrefab;
+    [Tooltip("Playback pitch/speed for BombFuse sound (0.75 = 25% slower).")]
+    [SerializeField] private float fuseAudioPitch = 0.75f;
+    [Tooltip("Time threshold in seconds when warning ticks start (default 6s).")]
+    [SerializeField] private int warningTimeThreshold = 6;
 
     [Header("Ground Check")]
     [SerializeField] private LayerMask groundLayer;
@@ -39,6 +43,7 @@ public class PlayerTimer : MonoBehaviour
     private float groundRestTimer = 0f;
     private bool isExploded;
     private bool hasDefusedThisDrop = false;
+    private int lastWarningTick = -1;
 
     private Vector3 initialVisualScale = Vector3.one;
     private Vector3 initialVisualLocalPos = Vector3.zero;
@@ -79,6 +84,7 @@ public class PlayerTimer : MonoBehaviour
     {
         GameManager.OnGameOver -= HandleGameOver;
         ScoreManager.OnDistance999Reached -= EnableSuperBomb;
+        if (AudioManager.Instance != null) AudioManager.Instance.StopLoopingSFX();
     }
 
     private void EnableSuperBomb()
@@ -92,6 +98,9 @@ public class PlayerTimer : MonoBehaviour
     public void LaunchSuperBomb()
     {
         if (!isSuperBombReady || isPermanentTrapPlaced) return;
+
+        // Cannot deploy Super Bomb in mid-air or during intro jump
+        if (playerMovement != null && (!playerMovement.IsGrounded || playerMovement.IsIntroJumping)) return;
 
         isSuperBombReady = false;
         isPermanentTrapPlaced = true;
@@ -170,12 +179,6 @@ public class PlayerTimer : MonoBehaviour
         if (isExploded) return;
         if (playerTransform == null) FindPlayer();
 
-        // Check for Super Bomb Trigger Input (S key or Down Arrow)
-        if (isSuperBombReady && (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)))
-        {
-            LaunchSuperBomb();
-        }
-
         // Check if player has explicit movement input
         float moveX = Input.GetAxisRaw("Horizontal");
         if (moveX < 0f) moveX = 0f; // Ignore left input
@@ -184,6 +187,12 @@ public class PlayerTimer : MonoBehaviour
         bool isPlayerGrounded = playerMovement != null ? playerMovement.IsGrounded : true;
         bool isAirborne = !isPlayerGrounded;
         bool isIntroJumping = playerMovement != null && playerMovement.IsIntroJumping;
+
+        // Check for Super Bomb Trigger Input (S key or Down Arrow) - MUST BE GROUNDED!
+        if (isSuperBombReady && isPlayerGrounded && !isIntroJumping && (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)))
+        {
+            LaunchSuperBomb();
+        }
 
         // Check player speed & forcefully lock velocity to zero if no input on ground and speed < 0.5f
         Rigidbody2D playerRb = (playerTransform != null) ? playerTransform.GetComponent<Rigidbody2D>() : null;
@@ -253,6 +262,13 @@ public class PlayerTimer : MonoBehaviour
                         currentTime = maxTime;
                         groundRestTimer = 0f;
                         hasDefusedThisDrop = true; // Stop defuse animation and forbid counting defuse rest timer again
+
+                        // 🔊 เล่นเสียงกู้ระเบิดสำเร็จ BombDefuse
+                        if (AudioManager.Instance != null)
+                        {
+                            AudioManager.Instance.StopLoopingSFX();
+                            AudioManager.Instance.PlaySFX("BombDefuse");
+                        }
                     }
                 }
                 else
@@ -266,6 +282,41 @@ public class PlayerTimer : MonoBehaviour
             {
                 groundRestTimer = 0f;
             }
+        }
+
+        // Handle Bomb Fuse & Defusing sound loops
+        bool isFuseActive = shouldHoldBomb && !isIntroJumping && !isSuperBombReady && !isPermanentTrapPlaced && !isExploded && (GameManager.Instance != null && GameManager.Instance.IsGameStarted);
+        bool isDefusingActive = IsDefusing && !isExploded && (GameManager.Instance != null && GameManager.Instance.IsGameStarted);
+
+        if (isFuseActive)
+        {
+            if (AudioManager.Instance != null) AudioManager.Instance.PlayLoopingSFX("BombFuse", fuseAudioPitch);
+        }
+        else if (isDefusingActive)
+        {
+            if (AudioManager.Instance != null) AudioManager.Instance.PlayLoopingSFX("Defusing");
+        }
+        else
+        {
+            if (AudioManager.Instance != null) AudioManager.Instance.StopLoopingSFX();
+        }
+
+        // Handle Bomb Warning sound ticks at warningTimeThreshold (6s default)
+        int currentCeilTime = Mathf.CeilToInt(currentTime);
+        if (currentCeilTime <= warningTimeThreshold && currentCeilTime > 0 && isFuseActive)
+        {
+            if (currentCeilTime != lastWarningTick)
+            {
+                lastWarningTick = currentCeilTime;
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlaySFX("BombWarning");
+                }
+            }
+        }
+        else if (currentCeilTime > warningTimeThreshold || !isFuseActive)
+        {
+            lastWarningTick = -1;
         }
 
         UpdateDefuseAnimation();
@@ -454,6 +505,12 @@ public class PlayerTimer : MonoBehaviour
     {
         isExploded = true;
         Debug.Log("<color=red>BOOM! Player Exploded!</color>");
+
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.StopLoopingSFX();
+            AudioManager.Instance.PlaySFX("BombExplode");
+        }
 
         // Play Explosion Particle Effect
         if (explosionParticlePrefab == null)

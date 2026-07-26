@@ -73,6 +73,13 @@ public class ChasingThreat : MonoBehaviour
     [Tooltip("Use 2D SpriteRenderer flipX instead of 3D Transform Y-rotation to prevent pivot warping.")]
     [SerializeField] private bool useSpriteFlipX = true;
 
+    [Header("Proximity Roar Settings")]
+    [Tooltip("Distance threshold to trigger a proximity roar warning when threat gets close.")]
+    [SerializeField] private float roarProximityDistance = 6.0f;
+    [Tooltip("Cooldown in seconds between proximity roars.")]
+    [SerializeField] private float roarCooldown = 6.0f;
+    private float lastRoarTime = -999f;
+
     // Component Cache
     private Rigidbody2D rb;
     private BoxCollider2D boxCollider;
@@ -147,6 +154,7 @@ public class ChasingThreat : MonoBehaviour
     {
         GameManager.OnGameOver += HandleGameOver;
         GameManager.OnGameStart += HandleGameStart;
+        PlayerMovement.OnPlayerIntroLand += HandlePlayerIntroLand;
     }
 
     private void OnDisable()
@@ -154,6 +162,16 @@ public class ChasingThreat : MonoBehaviour
         GameManager.OnGameOver -= HandleGameOver;
         GameManager.OnGameStart -= HandleGameStart;
         CameraFollow.OnCameraPanComplete -= OnCameraPanCompleteForIntro;
+        PlayerMovement.OnPlayerIntroLand -= HandlePlayerIntroLand;
+    }
+
+    private void HandlePlayerIntroLand()
+    {
+        // 🔊 เล่นเสียงคำราม MonsterRoar ทันทีที่ผู้เล่นตกกระทบพื้นจาก Intro Jump
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX("MonsterRoar");
+        }
     }
 
     private void HandleGameStart()
@@ -264,6 +282,16 @@ public class ChasingThreat : MonoBehaviour
     {
         if (isRetreating) return;
 
+        // 🔊 ถ้ามอนสเตอร์กำลังกระโดดอยู่แล้วชนโดน Player ให้เล่นเสียง MonsterLand และฝุ่นตบทันที
+        if (isJumping)
+        {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX("MonsterLand");
+            }
+            PlayLandDust();
+        }
+
         // Synchronize basePositionX to current actual position to eliminate position warping
         basePositionX = transform.position.x;
         isRetreating = true;
@@ -291,6 +319,7 @@ public class ChasingThreat : MonoBehaviour
     public void TriggerJumpIntro()
     {
         if (!enableJumpIntro) return;
+        if (isJumping && jumpSequence != null && jumpSequence.IsActive() && jumpSequence.IsPlaying()) return;
 
         jumpSequence?.Kill();
         graceTween?.Kill();
@@ -317,6 +346,15 @@ public class ChasingThreat : MonoBehaviour
             jumpSequence.AppendInterval(jumpIntroDelay);
         }
 
+        // 🔊 เล่นเสียง MonsterJump เมื่อจังหวะเริ่มพุ่งกระโดด
+        jumpSequence.AppendCallback(() =>
+        {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX("MonsterJump");
+            }
+        });
+
         float upDuration = jumpDuration * 0.45f;
         float downDuration = jumpDuration * 0.55f;
 
@@ -332,6 +370,16 @@ public class ChasingThreat : MonoBehaviour
             DOVirtual.Float(jumpPitchAngle, -jumpPitchAngle, jumpDuration, pitch => currentJumpPitch = pitch)
                 .SetEase(Ease.InOutSine)
         );
+
+        // 🔊 เล่นเสียง Ceiling_Fall เมื่อมอนสเตอร์ตกลงมาจากเพดาน/ด้านบน
+        jumpSequence.AppendCallback(() =>
+        {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX("Ceiling_Fall");
+            }
+        });
+
         jumpSequence.Append(
             DOVirtual.Float(jumpHeight, 0f, downDuration, y => currentJumpYOffset = y)
                 .SetEase(jumpDownEase)
@@ -350,6 +398,11 @@ public class ChasingThreat : MonoBehaviour
 
     private void PlayLandDust()
     {
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX("MonsterLand");
+        }
+
         Vector3 spawnPos = transform.position + new Vector3(0f, -0.5f, 0f);
         if (landDustPrefab == null)
         {
@@ -603,6 +656,20 @@ public class ChasingThreat : MonoBehaviour
         float targetX = basePositionX + (isJumping ? currentJumpXOffset : 0f);
         float yOffset = isJumping ? currentJumpYOffset : 0f;
         MoveToPosition(targetX, yOffset);
+
+        // 🔊 เล่นเสียง MonsterRoar เตือนเมื่อมอนสเตอร์วิ่งไล่ตามมาใกล้ผู้เล่น
+        float distanceToPlayer = playerX - transform.position.x;
+        if (distanceToPlayer <= roarProximityDistance && distanceToPlayer > 0f)
+        {
+            if (Time.time - lastRoarTime >= roarCooldown)
+            {
+                lastRoarTime = Time.time;
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlaySFX("MonsterRoar");
+                }
+            }
+        }
     }
 
     private void OnTriggerEnter2D(Collider2D collision)
@@ -627,6 +694,12 @@ public class ChasingThreat : MonoBehaviour
         if (target.CompareTag(playerTag) || target.GetComponent<PlayerMovement>() != null)
         {
             Debug.Log("<color=red>[ChasingThreat] Player caught by threat!</color>");
+
+            // 🔊 เล่นเสียง MonsterEat เมื่อจับ/งับตัวผู้เล่นกิน
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX("MonsterEat");
+            }
 
             Vector3 hitPos = target.transform.position;
 
