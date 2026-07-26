@@ -19,11 +19,18 @@ public class SettingsManager : MonoBehaviour
     private bool isPanelOpen = false;
     private bool isTransitioning = false; // 💡 ตัวแปรป้องกันการกดรัว (Spam Filter)
 
+    private static readonly int OpenAnimHash = Animator.StringToHash("Open_setting_UI_anim");
+    private static readonly int CloseAnimHash = Animator.StringToHash("Close_Setting_ui_anim");
+
     private void Awake()
     {
         if (settingsPanel != null)
         {
             animator = settingsPanel.GetComponent<Animator>();
+            if (animator != null)
+            {
+                animator.updateMode = AnimatorUpdateMode.UnscaledTime; // 💡 ให้ Animator เล่นแม้ปรับ Time.timeScale = 0
+            }
             settingsPanel.SetActive(false);
         }
     }
@@ -35,10 +42,17 @@ public class SettingsManager : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.P))
+        if (Input.GetKeyDown(KeyCode.P) || Input.GetKeyDown(KeyCode.Tab))
         {
             ToggleSettingsPanel();
         }
+    }
+
+    private void OnDisable()
+    {
+        // คืนค่า Time.timeScale ให้ปกติถ้าโดน Disable และบันทึก PlayerPrefs
+        Time.timeScale = 1f;
+        PlayerPrefs.Save();
     }
 
     // ─── Audio Volume Controls ───
@@ -55,7 +69,7 @@ public class SettingsManager : MonoBehaviour
 
         audioMixer.SetFloat(exposedParam, dbValue);
         PlayerPrefs.SetFloat(playerPrefKey, value);
-        PlayerPrefs.Save();
+        // ลบ PlayerPrefs.Save() ออกจากตรงนี้เพื่อป้องกันอาการกระตุกขณะลาก Slider
     }
 
     public void LoadVolume()
@@ -90,29 +104,44 @@ public class SettingsManager : MonoBehaviour
 
     public void OpenSettingsPanel()
     {
-        if (settingsPanel == null) return;
+        if (settingsPanel == null || isTransitioning) return;
+        
+        if (AudioManager.Instance != null) AudioManager.Instance.PlaySFX("ButtonClick");
+
+        // ⏸️ หยุดเกม (Pause)
+        Time.timeScale = 0f;
+
         settingsPanel.SetActive(true);
+        isPanelOpen = true;
         
         if (animator != null)
         {
             animator.enabled = true;
-            animator.Play("Open_setting_UI_anim");
+            animator.Play(OpenAnimHash);
             StartCoroutine(WaitAnimationFinish()); // 💡 ล็อคการกดจนกว่าจะเปิดสุด
         }
-        isPanelOpen = true;
     }
 
     public void CloseSettingsPanel()
     {
+        if (settingsPanel == null || isTransitioning) return;
+
+        if (AudioManager.Instance != null) AudioManager.Instance.PlaySFX("ButtonClick");
+
+        // บันทึกการตั้งค่าลงดิสก์เมื่อกดปิดหน้าต่าง UI
+        PlayerPrefs.Save();
+
         if (animator != null)
         {
-            animator.Play("Close_Setting_ui_anim");
+            animator.Play(CloseAnimHash);
             StartCoroutine(DeactivatePanelAfterAnimation()); // 💡 ล็อคการกดจนกว่าจะปิดสุด
         }
         else
         {
             settingsPanel.SetActive(false);
             isPanelOpen = false;
+            // ▶️ เล่นเกมต่อ (Unpause)
+            Time.timeScale = 1f;
         }
     }
 
@@ -130,8 +159,13 @@ public class SettingsManager : MonoBehaviour
         isTransitioning = true; // ล็อค
         yield return new WaitForSecondsRealtime(animationDuration);
         
-        settingsPanel.SetActive(false);
+        if (settingsPanel != null)
+        {
+            settingsPanel.SetActive(false);
+        }
         isPanelOpen = false;
+        // ▶️ เล่นเกมต่อเมื่อปิด UI เสร็จเรียบร้อย (Unpause)
+        Time.timeScale = 1f;
         isTransitioning = false; // ปลดล็อค
     }
 
@@ -145,6 +179,7 @@ public class SettingsManager : MonoBehaviour
 
     public void RestartLevel()
     {
+        PlayerPrefs.Save();
         Time.timeScale = 1f;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }

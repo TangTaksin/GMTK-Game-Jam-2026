@@ -186,6 +186,35 @@ MonoBehaviour:
   sfxLibrary:
   - name: Click
     clip: {fileID: 8300000, guid: 2e4b6ff3b43bf8049a08babb92a1fa7d, type: 3}
+  - name: GameStart
+    clip: {fileID: 8300000, guid: 185f86ba13ccc224c91ceff99b1805a9, type: 3}
+  - name: PlayerJump
+    clip: {fileID: 8300000, guid: 166c2991cf4ee264695bc3d7665834a2, type: 3}
+  - name: PlayerLand
+    clip: {fileID: 8300000, guid: be5bd90534db61244b2b69a8a76b5a90, type: 3}
+  - name: PlayerHit
+    clip: {fileID: 8300000, guid: 790aae2e7336f8245a8320920128fd5e, type: 3}
+  - name: PlayerJumpUpWater
+    clip: {fileID: 8300000, guid: a855cfdc107b8e540a5ca04d9646acfb, type: 3}
+  - name: ObstacleBreak
+    clip: {fileID: 8300000, guid: 790aae2e7336f8245a8320920128fd5e, type: 3}
+  - name: MonsterRoar
+    clip: {fileID: 8300000, guid: c77efce64303fe6409bbb258407dffcf, type: 3}
+  - name: MonsterJump
+    clip: {fileID: 8300000, guid: 4e6142f67493ffd4c8ad2db386c7eb58, type: 3}
+  - name: MonsterLand
+    clip: {fileID: 8300000, guid: dcdfe5ba25b297543a71298b57987396, type: 3}
+  - name: MonsterEat
+    clip: {fileID: 8300000, guid: 02c5a2ccd73a9f043be07f289ad1ce4e, type: 3}
+  - name: Ceiling_Fall
+    clip: {fileID: 8300000, guid: 29e78d5513347664a801fe1d072f6cec, type: 3}
+  - name: BombFuse
+    clip: {fileID: 8300000, guid: 375d90dc5249a1d4fb872e00db168a4e, type: 3}
+  - name: BombExplode
+    clip: {fileID: 8300000, guid: 1c2419bbc6a884140a5dde94854141fc, type: 3}
+  - name: BombWarning
+    clip: {fileID: 8300000, guid: 4e8be7415f27c9b40bbe6552d0a23f43, type: 3}
+  loopSFXSource: {fileID: 579321607855361387}
 --- !u!1 &8378100414635023576
 GameObject:
   m_ObjectHideFlags: 0
@@ -541,7 +570,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2665663944277331244, guid: 90adda4f698d50a47ae8223211e1d3dc, type: 3}
       propertyPath: m_SortingOrder
-      value: 500
+      value: 9999
       objectReference: {fileID: 0}
     - target: {fileID: 2792897849442193964, guid: 90adda4f698d50a47ae8223211e1d3dc, type: 3}
       propertyPath: m_AnchorMax.y

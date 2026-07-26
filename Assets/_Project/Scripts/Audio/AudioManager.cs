@@ -25,6 +25,8 @@ public class AudioManager : MonoBehaviour
     public List<SoundClip> sfxLibrary = new List<SoundClip>();
     private Dictionary<string, AudioClip> sfxDictionary = new Dictionary<string, AudioClip>();
 
+    private Coroutine activeMusicRoutine;
+
     private void Awake()
     {
         if (Instance == null)
@@ -35,7 +37,7 @@ public class AudioManager : MonoBehaviour
             // เตรียม Dictionary สำหรับ SFX
             foreach (var item in sfxLibrary)
             {
-                if (item.clip != null && !sfxDictionary.ContainsKey(item.name))
+                if (item != null && item.clip != null && !string.IsNullOrEmpty(item.name) && !sfxDictionary.ContainsKey(item.name))
                     sfxDictionary.Add(item.name, item.clip);
             }
         }
@@ -56,22 +58,35 @@ public class AudioManager : MonoBehaviour
 
     public void PlayMusic(AudioClip clip, float volume = 0.5f)
     {
-        if (clip == null) return;
+        if (clip == null || musicSource == null) return;
         
-        StopCoroutine("FadeInAudio");
-        musicSource.clip = clip;
-        StartCoroutine(FadeInAudio(musicSource, volume));
+        if (activeMusicRoutine != null)
+        {
+            StopCoroutine(activeMusicRoutine);
+        }
+        activeMusicRoutine = StartCoroutine(FadeInAudio(clip, volume));
     }
 
     public void StopMusic()
     {
-        StartCoroutine(FadeOutAudio(musicSource));
+        if (musicSource == null) return;
+
+        if (activeMusicRoutine != null)
+        {
+            StopCoroutine(activeMusicRoutine);
+        }
+        activeMusicRoutine = StartCoroutine(FadeOutAudio(musicSource));
     }
+
+    [Header("Looping SFX Source")]
+    [SerializeField] private AudioSource loopSFXSource;
 
     // ─── SFX Logic ───
 
     public void PlaySFX(string soundName)
     {
+        if (sfxSource == null) return;
+
         if (sfxDictionary.TryGetValue(soundName, out AudioClip clip))
         {
             sfxSource.pitch = Random.Range(minPitch, maxPitch);
@@ -83,30 +98,88 @@ public class AudioManager : MonoBehaviour
         }
     }
 
+    public void PlayLoopingSFX(string soundName, float pitch = 1.0f)
+    {
+        if (sfxDictionary.TryGetValue(soundName, out AudioClip clip))
+        {
+            if (loopSFXSource == null)
+            {
+                loopSFXSource = gameObject.AddComponent<AudioSource>();
+                loopSFXSource.loop = true;
+                if (sfxSource != null)
+                {
+                    loopSFXSource.outputAudioMixerGroup = sfxSource.outputAudioMixerGroup;
+                }
+            }
+
+            loopSFXSource.pitch = pitch;
+
+            if (loopSFXSource.clip == clip && loopSFXSource.isPlaying) return;
+
+            loopSFXSource.clip = clip;
+            loopSFXSource.loop = true;
+            loopSFXSource.Play();
+        }
+        else
+        {
+            Debug.LogWarning($"[AudioManager] ไม่พบเสียง Loop ชื่อ: {soundName}");
+        }
+    }
+
+    public void StopLoopingSFX()
+    {
+        if (loopSFXSource != null && loopSFXSource.isPlaying)
+        {
+            loopSFXSource.Stop();
+            loopSFXSource.clip = null;
+        }
+    }
+
     // ─── Fading Coroutines ───
 
-    private IEnumerator FadeInAudio(AudioSource source, float targetVolume)
+    private IEnumerator FadeInAudio(AudioClip clip, float targetVolume)
     {
-        source.volume = 0;
-        source.Play();
-        while (source.volume < targetVolume)
+        if (fadeInDuration <= 0f)
         {
-            source.volume += Time.deltaTime / fadeInDuration;
+            musicSource.clip = clip;
+            musicSource.volume = targetVolume;
+            musicSource.Play();
+            activeMusicRoutine = null;
+            yield break;
+        }
+
+        musicSource.clip = clip;
+        musicSource.volume = 0;
+        musicSource.Play();
+
+        while (musicSource.volume < targetVolume)
+        {
+            musicSource.volume += Time.unscaledDeltaTime / fadeInDuration;
             yield return null;
         }
-        source.volume = targetVolume;
+        musicSource.volume = targetVolume;
+        activeMusicRoutine = null;
     }
 
     private IEnumerator FadeOutAudio(AudioSource source)
     {
         float startVolume = source.volume;
+
+        if (fadeOutDuration <= 0f)
+        {
+            source.Stop();
+            activeMusicRoutine = null;
+            yield break;
+        }
+
         while (source.volume > 0)
         {
-            source.volume -= startVolume * Time.deltaTime / fadeOutDuration;
+            source.volume -= startVolume * Time.unscaledDeltaTime / fadeOutDuration;
             yield return null;
         }
         source.Stop();
-        source.volume = startVolume; 
+        source.volume = startVolume;
+        activeMusicRoutine = null;
     }
 }
 
